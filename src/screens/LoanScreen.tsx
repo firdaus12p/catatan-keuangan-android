@@ -1,6 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -15,7 +16,6 @@ import {
   Card,
   Chip,
   Divider,
-  FAB,
   IconButton,
   Menu,
   Modal,
@@ -231,6 +231,9 @@ export const LoanScreen: React.FC = () => {
     updateLoanStatus,
     deleteLoan,
   } = useApp();
+
+  const { action } = useLocalSearchParams<{ action?: string }>();
+
   const [modalVisible, setModalVisible] = useState(false);
   const [filterStatus, setFilterStatus] = useState<
     "all" | "unpaid" | "half" | "paid"
@@ -240,6 +243,13 @@ export const LoanScreen: React.FC = () => {
     amount: "",
     categoryId: "",
   });
+
+  // Handle floating action button actions
+  useEffect(() => {
+    if (action === "add") {
+      openModal();
+    }
+  }, [action]);
 
   // Refresh data saat screen difokuskan
   useFocusEffect(
@@ -461,16 +471,6 @@ export const LoanScreen: React.FC = () => {
         }
       />
 
-      {/* FAB untuk tambah pinjaman */}
-      <Portal>
-        <FAB
-          icon="plus"
-          style={styles.fab}
-          onPress={openModal}
-          label="Tambah Pinjaman"
-        />
-      </Portal>
-
       {/* Modal untuk add pinjaman */}
       <Portal>
         <Modal
@@ -674,13 +674,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#999999",
     marginTop: 16,
-  },
-  fab: {
-    position: "absolute",
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#2196F3",
   },
   modalContainer: {
     backgroundColor: "#FFFFFF",

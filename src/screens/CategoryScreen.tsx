@@ -1,5 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -12,7 +13,6 @@ import {
   Appbar,
   Button,
   Divider,
-  FAB,
   Modal,
   Portal,
   Surface,
@@ -32,12 +32,22 @@ export const CategoryScreen: React.FC = () => {
     updateCategory,
     deleteCategory,
   } = useApp();
+
+  const { action } = useLocalSearchParams<{ action?: string }>();
+
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     percentage: "",
   });
+
+  // Handle floating action button actions
+  useEffect(() => {
+    if (action === "add") {
+      openAddModal();
+    }
+  }, [action]);
 
   // Refresh data saat screen difokuskan
   useFocusEffect(
@@ -210,16 +220,6 @@ export const CategoryScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* FAB untuk tambah kategori */}
-      <Portal>
-        <FAB
-          icon="plus"
-          style={styles.fab}
-          onPress={openAddModal}
-          label="Tambah Kategori"
-        />
-      </Portal>
-
       {/* Modal untuk add/edit kategori */}
       <Portal>
         <Modal
@@ -341,13 +341,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginTop: 12,
-  },
-  fab: {
-    position: "absolute",
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#2196F3",
   },
   modalContainer: {
     backgroundColor: "#FFFFFF",

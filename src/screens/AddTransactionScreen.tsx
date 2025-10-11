@@ -1,6 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -15,7 +16,6 @@ import {
   Card,
   Chip,
   Divider,
-  FAB,
   Modal,
   Portal,
   RadioButton,
@@ -43,6 +43,8 @@ export const AddTransactionScreen: React.FC = () => {
     addGlobalIncome,
   } = useApp();
 
+  const { action } = useLocalSearchParams<{ action?: string }>();
+
   const [modalVisible, setModalVisible] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">(
     "income"
@@ -56,6 +58,15 @@ export const AddTransactionScreen: React.FC = () => {
   const [filter, setFilter] = useState<"all" | "current" | "previous">(
     "current"
   );
+
+  // Handle floating action button actions
+  useEffect(() => {
+    if (action === "income") {
+      openModal("income");
+    } else if (action === "expense") {
+      openModal("expense");
+    }
+  }, [action]);
 
   // Refresh data saat screen difokuskan
   useFocusEffect(
@@ -288,22 +299,6 @@ export const AddTransactionScreen: React.FC = () => {
         }
       />
 
-      {/* FAB untuk tambah transaksi */}
-      <View style={styles.fabContainer}>
-        <FAB
-          icon="trending-up"
-          style={[styles.fab, { backgroundColor: "#4CAF50" }]}
-          onPress={() => openModal("income")}
-          label="Pemasukan"
-        />
-        <FAB
-          icon="trending-down"
-          style={[styles.fab, { backgroundColor: "#F44336", marginTop: 8 }]}
-          onPress={() => openModal("expense")}
-          label="Pengeluaran"
-        />
-      </View>
-
       {/* Modal untuk add transaksi */}
       <Portal>
         <Modal
@@ -510,15 +505,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#999999",
     marginTop: 16,
-  },
-  fabContainer: {
-    position: "absolute",
-    right: 16,
-    bottom: 16,
-    alignItems: "flex-end",
-  },
-  fab: {
-    marginVertical: 4,
   },
   modalContainer: {
     backgroundColor: "#FFFFFF",

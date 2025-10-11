@@ -7,17 +7,17 @@ Tasklist ini berfungsi sebagai panduan langkah demi langkah agar setiap proses p
 ---
 
 ## 🏗️ **FASE 1 – INISIALISASI PROYEK**
-- [ ] Membuat project Expo baru: `npx create-expo-app catatan-keuangan`
+- [x] Membuat project Expo baru: `npx create-expo-app catatan-keuangan`
 - [ ] Menjalankan project pertama kali: `npx expo start`
 - [ ] Install dependency utama:
-  - [ ] `expo-sqlite`
-  - [ ] `@react-navigation/native`, `@react-navigation/bottom-tabs`, `react-native-screens`, `react-native-safe-area-context`
-  - [ ] `react-native-chart-kit` atau `react-native-svg-charts`
-  - [ ] `expo-splash-screen`
-  - [ ] `@expo/vector-icons`
-  - [ ] `react-native-paper` atau `native-base`
-- [ ] Membuat struktur folder proyek:
-  - [ ] Struktur folder:
+  - [x] `expo-sqlite`
+  - [x] `@react-navigation/native`, `@react-navigation/bottom-tabs`, `react-native-screens`, `react-native-safe-area-context`
+  - [x] `react-native-chart-kit` atau `react-native-svg-charts`
+  - [x] `expo-splash-screen`
+  - [x] `@expo/vector-icons`
+  - [x] `react-native-paper` atau `native-base`
+- [x] Membuat struktur folder proyek:
+  - [x] Struktur folder:
     ```
     /App.js
     /src/
@@ -28,131 +28,131 @@ Tasklist ini berfungsi sebagai panduan langkah demi langkah agar setiap proses p
      ├─ utils/
      ├─ assets/
     ```
-- [ ] Menambahkan icon dan splash logo ke `/src/assets/`
-- [ ] Membuat splash screen dasar dengan `expo-splash-screen`
+- [x] Menambahkan icon dan splash logo ke `/src/assets/`
+- [x] Membuat splash screen dasar dengan `expo-splash-screen`
 
 ---
 
 ## 🧱 **FASE 2 – KONFIGURASI DATABASE (SQLite)**
-- [ ] Membuat file `/src/db/database.js`
-- [ ] Menginisialisasi koneksi SQLite menggunakan `expo-sqlite`
-- [ ] Membuat file `/src/db/migrations.sql` untuk skema awal database
-- [ ] Menyiapkan tabel:
-  - [ ] `categories (id, name, percentage, balance)`
-  - [ ] `transactions (id, type, amount, category_id, note, date)`
-  - [ ] `loans (id, name, amount, category_id, status, date)`
-- [ ] Menambahkan indexing untuk performa:
-  - [ ] `CREATE INDEX idx_category_id ON transactions(category_id)`
-  - [ ] `CREATE INDEX idx_date ON transactions(date)`
-- [ ] Memastikan database auto-create saat aplikasi pertama dijalankan
+- [x] Membuat file `/src/db/database.js`
+- [x] Menginisialisasi koneksi SQLite menggunakan `expo-sqlite`
+- [x] Membuat file `/src/db/migrations.sql` untuk skema awal database
+- [x] Menyiapkan tabel:
+  - [x] `categories (id, name, percentage, balance)`
+  - [x] `transactions (id, type, amount, category_id, note, date)`
+  - [x] `loans (id, name, amount, category_id, status, date)`
+- [x] Menambahkan indexing untuk performa:
+  - [x] `CREATE INDEX idx_category_id ON transactions(category_id)`
+  - [x] `CREATE INDEX idx_date ON transactions(date)`
+- [x] Memastikan database auto-create saat aplikasi pertama dijalankan
 
 ---
 
 ## 💰 **FASE 3 – FITUR KATEGORI**
-- [ ] Membuat screen `/src/screens/CategoryScreen.js`
-- [ ] Membuat component `/src/components/CategoryCard.js`
-- [ ] Implementasi CRUD kategori:
-  - [ ] Tambah kategori baru
-  - [ ] Edit kategori (nama & persentase)
-  - [ ] Hapus kategori
-- [ ] Menambahkan kategori default:
-  - [ ] Sedekah 10%
-  - [ ] Uang tak terduga 15%
-  - [ ] Uang belanja 40%
-  - [ ] Tabungan 15%
-  - [ ] Operasional 10%
-  - [ ] Maintenance 10%
-- [ ] Menyimpan kategori ke SQLite
-- [ ] Validasi total persentase ≤ 100%
+- [x] Membuat screen `/src/screens/CategoryScreen.js`
+- [x] Membuat component `/src/components/CategoryCard.js`
+- [x] Implementasi CRUD kategori:
+  - [x] Tambah kategori baru
+  - [x] Edit kategori (nama & persentase)
+  - [x] Hapus kategori
+- [x] Menambahkan kategori default:
+  - [x] Sedekah 10%
+  - [x] Uang tak terduga 15%
+  - [x] Uang belanja 40%
+  - [x] Tabungan 15%
+  - [x] Operasional 10%
+  - [x] Maintenance 10%
+- [x] Menyimpan kategori ke SQLite
+- [x] Validasi total persentase <= 100%
 
 ---
 
 ## 💸 **FASE 4 – FITUR TRANSAKSI**
-- [ ] Membuat screen `/src/screens/AddTransactionScreen.js`
-- [ ] Membuat component `/src/components/TransactionItem.js`
-- [ ] Menambahkan fungsi:
-  - [ ] Tambah pemasukan global (otomatis dibagi ke semua kategori)
-  - [ ] Tambah pemasukan ke kategori tertentu
-  - [ ] Tambah pengeluaran (pilih kategori sumber)
-- [ ] Menyimpan transaksi ke SQLite (`type = income / expense`)
-- [ ] Menggunakan `useFocusEffect()` untuk refresh data otomatis
-- [ ] Menambahkan pagination atau lazy load (`LIMIT + OFFSET`)
-- [ ] Menambahkan filter transaksi:
-  - [ ] Bulan ini
-  - [ ] Bulan lalu
-  - [ ] Semua data
-- [ ] Menambahkan pencarian transaksi berdasarkan kategori atau catatan
+- [x] Membuat screen `/src/screens/AddTransactionScreen.js`
+- [x] Membuat component `/src/components/TransactionItem.js`
+- [x] Menambahkan fungsi:
+  - [x] Tambah pemasukan global (otomatis dibagi ke semua kategori)
+  - [x] Tambah pemasukan ke kategori tertentu
+  - [x] Tambah pengeluaran (pilih kategori sumber)
+- [x] Menyimpan transaksi ke SQLite (`type = income / expense`)
+- [x] Menggunakan `useFocusEffect()` untuk refresh data otomatis
+- [x] Menambahkan pagination atau lazy load (`LIMIT + OFFSET`)
+- [x] Menambahkan filter transaksi:
+  - [x] Bulan ini
+  - [x] Bulan lalu
+  - [x] Semua data
+- [x] Menambahkan pencarian transaksi berdasarkan kategori atau catatan
 
 ---
 
 ## 🤝 **FASE 5 – FITUR PINJAMAN**
-- [ ] Membuat screen `/src/screens/LoanScreen.js`
-- [ ] Membuat tabel `loans` di SQLite jika belum ada
-- [ ] Menambahkan form tambah pinjaman:
-  - [ ] Nama peminjam
-  - [ ] Jumlah uang
-  - [ ] Kategori sumber
-  - [ ] Tanggal pinjam
-- [ ] Menambahkan tombol aksi:
-  - [ ] **Lunas:** mengembalikan saldo ke kategori sumber
-  - [ ] **Bayar Setengah:** mengembalikan sebagian saldo ke kategori sumber
-  - [ ] **Hapus:** menghapus data pinjaman
-- [ ] Mengatur status pinjaman:
-  - [ ] `unpaid`
-  - [ ] `half`
-  - [ ] `paid`
-- [ ] Memastikan update kategori sinkron saat pinjaman berubah status
+- [x] Membuat screen `/src/screens/LoanScreen.js`
+- [x] Membuat tabel `loans` di SQLite jika belum ada
+- [x] Menambahkan form tambah pinjaman:
+  - [x] Nama peminjam
+  - [x] Jumlah uang
+  - [x] Kategori sumber
+  - [x] Tanggal pinjam
+- [x] Menambahkan tombol aksi:
+  - [x] **Lunas:** mengembalikan saldo ke kategori sumber
+  - [x] **Bayar Setengah:** mengembalikan sebagian saldo ke kategori sumber
+  - [x] **Hapus:** menghapus data pinjaman
+- [x] Mengatur status pinjaman:
+  - [x] `unpaid`
+  - [x] `half`
+  - [x] `paid`
+- [x] Memastikan update kategori sinkron saat pinjaman berubah status
 
 ---
 
 ## 📊 **FASE 6 – DASHBOARD & STATISTIK**
-- [ ] Membuat screen `/src/screens/HomeScreen.js`
-- [ ] Membuat component `/src/components/ChartCard.js`
-- [ ] Menampilkan:
-  - [ ] Total pemasukan bulan ini
-  - [ ] Total pengeluaran bulan ini
-  - [ ] Grafik pemasukan vs pengeluaran (batang/l lingkaran)
-- [ ] Menggunakan `react-native-chart-kit` untuk visualisasi
-- [ ] Menambahkan filter waktu:
-  - [ ] Bulan ini
-  - [ ] Bulan lalu
-  - [ ] Semua bulan
-- [ ] Menambahkan tampilan proporsi kategori (persentase alokasi)
+- [x] Membuat screen `/src/screens/HomeScreen.js`
+- [x] Membuat component `/src/components/ChartCard.js`
+- [x] Menampilkan:
+  - [x] Total pemasukan bulan ini
+  - [x] Total pengeluaran bulan ini
+  - [x] Grafik pemasukan vs pengeluaran (batang/l lingkaran)
+- [x] Menggunakan `react-native-chart-kit` untuk visualisasi
+- [x] Menambahkan filter waktu:
+  - [x] Bulan ini
+  - [x] Bulan lalu
+  - [x] Semua bulan
+- [x] Menambahkan tampilan proporsi kategori (persentase alokasi)
 
 ---
 
 ## 🧭 **FASE 7 – NAVIGASI & KONTEXT**
-- [ ] Menambahkan navigasi utama dengan `@react-navigation/native`
-- [ ] Menambahkan BottomTabNavigation atau DrawerNavigation
-- [ ] Membuat context global `/src/context/AppContext.js`
-- [ ] Mengelola state:
-  - [ ] Data kategori
-  - [ ] Data transaksi
-  - [ ] Data pinjaman
-- [ ] Menggunakan Context Provider di `App.js`
+- [x] Menambahkan navigasi utama dengan `@react-navigation/native`
+- [x] Menambahkan BottomTabNavigation atau DrawerNavigation
+- [x] Membuat context global `/src/context/AppContext.js`
+- [x] Mengelola state:
+  - [x] Data kategori
+  - [x] Data transaksi
+  - [x] Data pinjaman
+- [x] Menggunakan Context Provider di `App.js`
 
 ---
 
 ## 🎨 **FASE 8 – UI & UX FINAL**
-- [ ] Desain menggunakan warna lembut (biru muda, hijau lembut, pastel)
-- [ ] Semua tombol memiliki ikon + label
-- [ ] Menambahkan loading indicator saat proses data
+- [x] Desain menggunakan warna lembut (biru muda, hijau lembut, pastel)
+- [x] Semua tombol memiliki ikon + label
+- [x] Menambahkan loading indicator saat proses data
 - [ ] Menambahkan animasi ringan (fade-in, press effect)
-- [ ] Responsif di berbagai ukuran layar Android
-- [ ] Menggunakan komponen dari `react-native-paper` / `native-base`
+- [x] Responsif di berbagai ukuran layar Android
+- [x] Menggunakan komponen dari `react-native-paper` / `native-base`
 
 ---
 
 ## 🚀 **FASE 9 – SPLASH SCREEN & OPTIMASI**
-- [ ] Membuat splash screen menggunakan `expo-splash-screen`
-- [ ] Menampilkan logo “💸 CatatKu” selama 2–3 detik
-- [ ] Transisi halus ke HomeScreen
-- [ ] Optimasi performa:
-  - [ ] Gunakan `async/await` di semua operasi database
-  - [ ] Implementasi pagination di semua list
-  - [ ] Indexing tabel SQLite
-  - [ ] Hindari rendering berlebih
-  - [ ] Pastikan semua async call ditangani dengan try/catch
+- [x] Membuat splash screen menggunakan `expo-splash-screen`
+- [x] Menampilkan logo CatatKu selama 2-3 detik
+- [x] Transisi halus ke HomeScreen
+- [x] Optimasi performa:
+  - [x] Gunakan `async/await` di semua operasi database
+  - [x] Implementasi pagination di semua list
+  - [x] Indexing tabel SQLite
+  - [x] Hindari rendering berlebih
+  - [x] Pastikan semua async call ditangani dengan try/catch
 
 ---
 

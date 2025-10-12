@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -44,6 +44,7 @@ export const AddTransactionScreen: React.FC = () => {
   } = useApp();
 
   const { action } = useLocalSearchParams<{ action?: string }>();
+  const router = useRouter();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">(
@@ -63,8 +64,12 @@ export const AddTransactionScreen: React.FC = () => {
   useEffect(() => {
     if (action === "income") {
       openModal("income");
+      // Clear parameter setelah digunakan
+      router.replace("/(tabs)/transaction");
     } else if (action === "expense") {
       openModal("expense");
+      // Clear parameter setelah digunakan
+      router.replace("/(tabs)/transaction");
     }
   }, [action]);
 

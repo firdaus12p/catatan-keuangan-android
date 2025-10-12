@@ -15,8 +15,8 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>💸 CatatKu</Text>
-      <Text style={styles.subtitle}>Aplikasi Catatan Keuangan Pribadi</Text>
+      <Text style={styles.logo}>💸 Kemenku</Text>
+      <Text style={styles.subtitle}>Kementrian Keuangan Pribadi</Text>
       <ActivityIndicator
         animating={true}
         color="#2196F3"

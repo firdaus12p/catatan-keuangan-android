@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -34,6 +34,7 @@ export const CategoryScreen: React.FC = () => {
   } = useApp();
 
   const { action } = useLocalSearchParams<{ action?: string }>();
+  const router = useRouter();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -46,6 +47,8 @@ export const CategoryScreen: React.FC = () => {
   useEffect(() => {
     if (action === "add") {
       openAddModal();
+      // Clear parameter setelah digunakan
+      router.replace("/(tabs)/category");
     }
   }, [action]);
 

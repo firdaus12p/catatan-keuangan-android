@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -32,6 +32,8 @@ import { formatCurrency, parseCurrency } from "../utils/formatCurrency";
 interface LoanItemProps {
   loan: Loan;
   categories: any[];
+  isMenuVisible: boolean;
+  onToggleMenu: (loanId: number) => void;
   onUpdateStatus: (
     id: number,
     status: "unpaid" | "half" | "paid",
@@ -43,10 +45,11 @@ interface LoanItemProps {
 const LoanItem: React.FC<LoanItemProps> = ({
   loan,
   categories,
+  isMenuVisible,
+  onToggleMenu,
   onUpdateStatus,
   onDelete,
 }) => {
-  const [menuVisible, setMenuVisible] = useState(false);
   const [repaymentModalVisible, setRepaymentModalVisible] = useState(false);
   const [repaymentAmount, setRepaymentAmount] = useState("");
 
@@ -81,7 +84,7 @@ const LoanItem: React.FC<LoanItemProps> = ({
   };
 
   const handleMarkPaid = () => {
-    setMenuVisible(false);
+    onToggleMenu(loan.id!);
     Alert.alert("Konfirmasi", `Tandai pinjaman ${loan.name} sebagai lunas?`, [
       { text: "Batal", style: "cancel" },
       { text: "Ya", onPress: () => onUpdateStatus(loan.id!, "paid") },
@@ -89,7 +92,7 @@ const LoanItem: React.FC<LoanItemProps> = ({
   };
 
   const handlePartialPayment = () => {
-    setMenuVisible(false);
+    onToggleMenu(loan.id!);
     setRepaymentAmount("");
     setRepaymentModalVisible(true);
   };
@@ -106,7 +109,7 @@ const LoanItem: React.FC<LoanItemProps> = ({
   };
 
   const handleDelete = () => {
-    setMenuVisible(false);
+    onToggleMenu(loan.id!);
     Alert.alert(
       "Hapus Pinjaman",
       `Apakah Anda yakin ingin menghapus pinjaman ${loan.name}?`,
@@ -146,14 +149,17 @@ const LoanItem: React.FC<LoanItemProps> = ({
 
               {loan.status !== "paid" && (
                 <Menu
-                  visible={menuVisible}
-                  onDismiss={() => setMenuVisible(false)}
+                  key={`menu-${loan.id}`}
+                  visible={isMenuVisible}
+                  onDismiss={() => onToggleMenu(loan.id!)}
                   anchor={
                     <IconButton
                       icon="dots-vertical"
-                      onPress={() => setMenuVisible(true)}
+                      onPress={() => onToggleMenu(loan.id!)}
+                      disabled={false}
                     />
                   }
+                  anchorPosition="bottom"
                 >
                   <Menu.Item onPress={handleMarkPaid} title="Tandai Lunas" />
                   <Menu.Item
@@ -233,8 +239,10 @@ export const LoanScreen: React.FC = () => {
   } = useApp();
 
   const { action } = useLocalSearchParams<{ action?: string }>();
+  const router = useRouter();
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<
     "all" | "unpaid" | "half" | "paid"
   >("all");
@@ -248,6 +256,8 @@ export const LoanScreen: React.FC = () => {
   useEffect(() => {
     if (action === "add") {
       openModal();
+      // Clear parameter setelah digunakan
+      router.replace("/(tabs)/loan");
     }
   }, [action]);
 
@@ -258,6 +268,23 @@ export const LoanScreen: React.FC = () => {
       loadLoans();
     }, [])
   );
+
+  // Reset activeMenuId saat component unmount atau loans berubah
+  useEffect(() => {
+    return () => {
+      setActiveMenuId(null);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Reset menu jika loan yang memiliki menu aktif sudah tidak ada
+    if (activeMenuId !== null) {
+      const loanExists = loans.some((loan) => loan.id === activeMenuId);
+      if (!loanExists) {
+        setActiveMenuId(null);
+      }
+    }
+  }, [loans, activeMenuId]);
 
   const resetForm = () => {
     setFormData({
@@ -275,6 +302,21 @@ export const LoanScreen: React.FC = () => {
   const closeModal = () => {
     setModalVisible(false);
     resetForm();
+  };
+
+  const handleToggleMenu = (loanId: number) => {
+    // Prevent rapid toggles
+    setTimeout(() => {
+      setActiveMenuId((prevId) => {
+        // Jika menu sudah terbuka untuk loan ini, tutup
+        if (prevId === loanId) {
+          return null;
+        } else {
+          // Buka menu untuk loan ini (tutup yang lain)
+          return loanId;
+        }
+      });
+    }, 10); // Small delay to prevent race conditions
   };
 
   const validateForm = (): boolean => {
@@ -442,6 +484,8 @@ export const LoanScreen: React.FC = () => {
     <LoanItem
       loan={item}
       categories={categories}
+      isMenuVisible={activeMenuId === item.id}
+      onToggleMenu={handleToggleMenu}
       onUpdateStatus={handleUpdateStatus}
       onDelete={handleDelete}
     />

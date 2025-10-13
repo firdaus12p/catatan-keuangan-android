@@ -293,6 +293,18 @@ class Database {
         [loan.amount, loan.category_id]
       );
 
+      // Catat sebagai transaksi pengeluaran di riwayat
+      await this.db.runAsync(
+        "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
+        [
+          "expense",
+          loan.amount,
+          loan.category_id,
+          `Pinjaman kepada: ${loan.name}`,
+          loan.date,
+        ]
+      );
+
       return result.lastInsertRowId;
     } catch (error) {
       console.error("Error adding loan:", error);
@@ -314,23 +326,60 @@ class Database {
 
       if (!loan) throw new Error("Loan not found");
 
+      // Logika otomatis: jika pembayaran >= jumlah pinjaman, set status menjadi "paid"
+      let finalStatus = status;
+      let finalRepaymentAmount = repaymentAmount || 0;
+
+      if (
+        status === "half" &&
+        repaymentAmount &&
+        repaymentAmount >= loan.amount
+      ) {
+        finalStatus = "paid";
+        finalRepaymentAmount = loan.amount;
+      }
+
       await this.db.runAsync("UPDATE loans SET status = ? WHERE id = ?", [
-        status,
+        finalStatus,
         id,
       ]);
 
-      // Kembalikan uang ke kategori sesuai status
-      if (status === "paid") {
+      // Kembalikan uang ke kategori sesuai status dan catat transaksi
+      if (finalStatus === "paid") {
         // Lunas - kembalikan semua uang
         await this.db.runAsync(
           "UPDATE categories SET balance = balance + ? WHERE id = ?",
           [loan.amount, loan.category_id]
         );
-      } else if (status === "half" && repaymentAmount) {
+
+        // Catat sebagai transaksi pemasukan
+        await this.db.runAsync(
+          "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
+          [
+            "income",
+            loan.amount,
+            loan.category_id,
+            `Pelunasan pinjaman dari: ${loan.name}`,
+            new Date().toISOString(),
+          ]
+        );
+      } else if (finalStatus === "half" && finalRepaymentAmount > 0) {
         // Bayar sebagian - kembalikan sebagian uang
         await this.db.runAsync(
           "UPDATE categories SET balance = balance + ? WHERE id = ?",
-          [repaymentAmount, loan.category_id]
+          [finalRepaymentAmount, loan.category_id]
+        );
+
+        // Catat sebagai transaksi pemasukan
+        await this.db.runAsync(
+          "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
+          [
+            "income",
+            finalRepaymentAmount,
+            loan.category_id,
+            `Pembayaran sebagian pinjaman dari: ${loan.name} (${finalRepaymentAmount}/${loan.amount})`,
+            new Date().toISOString(),
+          ]
         );
       }
     } catch (error) {

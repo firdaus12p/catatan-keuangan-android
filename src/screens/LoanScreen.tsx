@@ -25,7 +25,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
 import { Loan } from "../db/database";
 import { formatDate, getTodayString } from "../utils/dateHelper";
-import { formatCurrency, parseCurrency } from "../utils/formatCurrency";
+import {
+  formatCurrency,
+  formatNumberInput,
+  parseNumberInput,
+} from "../utils/formatCurrency";
 
 interface LoanItemProps {
   loan: Loan;
@@ -98,7 +102,7 @@ const LoanItem: React.FC<LoanItemProps> = ({
   };
 
   const handleConfirmPartialPayment = () => {
-    const amount = parseCurrency(repaymentAmount);
+    const amount = parseNumberInput(repaymentAmount);
     if (amount <= 0 || amount > loan.amount) {
       Alert.alert("Error", "Jumlah pembayaran tidak valid");
       return;
@@ -206,7 +210,10 @@ const LoanItem: React.FC<LoanItemProps> = ({
           <TextInput
             label="Jumlah Pembayaran"
             value={repaymentAmount}
-            onChangeText={setRepaymentAmount}
+            onChangeText={(text) => {
+              const formatted = formatNumberInput(text);
+              setRepaymentAmount(formatted);
+            }}
             style={styles.input}
             mode="outlined"
             keyboardType="numeric"
@@ -315,7 +322,7 @@ export const LoanScreen: React.FC = () => {
       return false;
     }
 
-    const amount = parseCurrency(formData.amount);
+    const amount = parseNumberInput(formData.amount);
     if (amount <= 0) {
       Alert.alert("Error", "Jumlah pinjaman harus lebih dari 0");
       return false;
@@ -349,7 +356,7 @@ export const LoanScreen: React.FC = () => {
     try {
       const loanData = {
         name: formData.name.trim(),
-        amount: parseCurrency(formData.amount),
+        amount: parseNumberInput(formData.amount),
         category_id: parseInt(formData.categoryId),
         status: "unpaid" as const,
         date: getTodayString(),
@@ -534,13 +541,14 @@ export const LoanScreen: React.FC = () => {
             <TextInput
               label="Jumlah Pinjaman"
               value={formData.amount}
-              onChangeText={(text) =>
-                setFormData({ ...formData, amount: text })
-              }
+              onChangeText={(text) => {
+                const formatted = formatNumberInput(text);
+                setFormData({ ...formData, amount: formatted });
+              }}
               style={styles.input}
               mode="outlined"
               keyboardType="numeric"
-              placeholder="Contoh: 500000"
+              placeholder="Contoh: 500.000"
               left={<TextInput.Affix text="Rp " />}
             />
 

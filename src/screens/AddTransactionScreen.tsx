@@ -31,7 +31,11 @@ import {
   getMonthName,
   getTodayString,
 } from "../utils/dateHelper";
-import { formatCurrency, parseCurrency } from "../utils/formatCurrency";
+import {
+  formatCurrency,
+  formatNumberInput,
+  parseNumberInput,
+} from "../utils/formatCurrency";
 
 export const AddTransactionScreen: React.FC = () => {
   const {
@@ -106,7 +110,7 @@ export const AddTransactionScreen: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
-    const amount = parseCurrency(formData.amount);
+    const amount = parseNumberInput(formData.amount);
 
     if (amount <= 0) {
       Alert.alert("Error", "Jumlah harus lebih dari 0");
@@ -143,7 +147,7 @@ export const AddTransactionScreen: React.FC = () => {
     if (!validateForm()) return;
 
     try {
-      const amount = parseCurrency(formData.amount);
+      const amount = parseNumberInput(formData.amount);
 
       if (transactionType === "income" && isGlobalIncome) {
         // Pemasukan global - dibagi otomatis ke semua kategori
@@ -353,13 +357,14 @@ export const AddTransactionScreen: React.FC = () => {
             <TextInput
               label="Jumlah"
               value={formData.amount}
-              onChangeText={(text) =>
-                setFormData({ ...formData, amount: text })
-              }
+              onChangeText={(text) => {
+                const formatted = formatNumberInput(text);
+                setFormData({ ...formData, amount: formatted });
+              }}
               style={styles.input}
               mode="outlined"
               keyboardType="numeric"
-              placeholder="Contoh: 150000"
+              placeholder="Contoh: 150.000"
               left={<TextInput.Affix text="Rp " />}
             />
 

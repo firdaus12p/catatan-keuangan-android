@@ -13,6 +13,25 @@ export const formatNumber = (amount: number): string => {
   return new Intl.NumberFormat("id-ID").format(amount);
 };
 
+// Format angka untuk input dengan titik sebagai pemisah ribuan
+export const formatNumberInput = (value: string): string => {
+  // Hapus semua karakter non-digit
+  const numbers = value.replace(/[^\d]/g, "");
+
+  // Jika kosong, return kosong
+  if (!numbers) return "";
+
+  // Format dengan titik sebagai pemisah ribuan
+  return parseInt(numbers).toLocaleString("id-ID");
+};
+
+// Parse string input kembali ke number
+export const parseNumberInput = (value: string): number => {
+  // Hapus semua karakter non-digit
+  const numbers = value.replace(/[^\d]/g, "");
+  return parseInt(numbers) || 0;
+};
+
 // Parse string currency menjadi number
 export const parseCurrency = (currencyString: string): number => {
   // Hilangkan semua karakter non-digit kecuali koma dan titik

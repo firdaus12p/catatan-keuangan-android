@@ -188,6 +188,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await database.addLoan(loan);
       await loadLoans(); // Refresh data
       await loadCategories(); // Refresh categories untuk update saldo
+      await loadTransactions(); // Refresh transactions untuk update riwayat
     } catch (error) {
       console.error("Error adding loan:", error);
       throw error;
@@ -203,6 +204,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await database.updateLoanStatus(id, status, repaymentAmount);
       await loadLoans(); // Refresh data
       await loadCategories(); // Refresh categories untuk update saldo
+      await loadTransactions(); // Refresh transactions untuk update riwayat
     } catch (error) {
       console.error("Error updating loan status:", error);
       throw error;

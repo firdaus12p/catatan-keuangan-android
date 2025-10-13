@@ -451,7 +451,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingRight: 238,
     gap: 8,
+    justifyContent: "flex-start",
   },
   filterChip: {
     backgroundColor: "#FFFFFF",

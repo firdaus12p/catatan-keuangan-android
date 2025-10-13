@@ -1,0 +1,7 @@
+# Template untuk favicon.png
+# Ukuran: 48x48 pixel
+# Format: PNG
+# Keterangan: Icon untuk versi web aplikasi
+
+# Letakkan file favicon.png Anda di sini, lalu copy ke:
+# assets/images/favicon.png

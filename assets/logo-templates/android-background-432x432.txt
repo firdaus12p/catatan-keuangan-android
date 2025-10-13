@@ -1,0 +1,8 @@
+# Template untuk android-icon-background.png
+# Ukuran: 432x432 pixel
+# Format: PNG
+# Warna: #E6F4FE (biru muda) atau sesuai tema
+# Keterangan: Background untuk adaptive icon Android
+
+# Letakkan file android-icon-background.png Anda di sini, lalu copy ke:
+# assets/images/android-icon-background.png

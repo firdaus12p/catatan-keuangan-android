@@ -427,6 +427,60 @@ class Database {
       throw error;
     }
   }
+
+  // Reset functions untuk membersihkan data
+  async resetAllData(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      await this.db.execAsync("DELETE FROM transactions");
+      await this.db.execAsync("DELETE FROM loans");
+      await this.db.execAsync("UPDATE categories SET balance = 0");
+    } catch (error) {
+      console.error("Error resetting all data:", error);
+      throw error;
+    }
+  }
+
+  async resetTransactions(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      await this.db.execAsync("DELETE FROM transactions");
+      await this.db.execAsync("UPDATE categories SET balance = 0");
+    } catch (error) {
+      console.error("Error resetting transactions:", error);
+      throw error;
+    }
+  }
+
+  async resetLoans(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      await this.db.execAsync("DELETE FROM loans");
+    } catch (error) {
+      console.error("Error resetting loans:", error);
+      throw error;
+    }
+  }
+
+  async resetCategories(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      await this.db.execAsync("DELETE FROM categories");
+    } catch (error) {
+      console.error("Error resetting categories:", error);
+      throw error;
+    }
+  }
+
+  async resetCategoryBalances(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      await this.db.execAsync("UPDATE categories SET balance = 0");
+    } catch (error) {
+      console.error("Error resetting category balances:", error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

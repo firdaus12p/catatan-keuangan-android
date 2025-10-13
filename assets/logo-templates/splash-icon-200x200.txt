@@ -1,0 +1,7 @@
+# Template untuk splash-icon.png
+# Ukuran: 200x200 pixel (bisa sampai 400x400)
+# Format: PNG dengan background transparan
+# Keterangan: Logo yang muncul di splash screen saat loading
+
+# Letakkan file splash-icon.png Anda di sini, lalu copy ke:
+# assets/images/splash-icon.png

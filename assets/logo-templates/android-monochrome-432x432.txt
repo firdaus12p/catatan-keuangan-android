@@ -1,0 +1,8 @@
+# Template untuk android-icon-monochrome.png
+# Ukuran: 432x432 pixel
+# Format: PNG hitam putih (grayscale)
+# Warna: Hanya hitam (#000000) dan transparan
+# Keterangan: Versi monokrom untuk themed icons Android 13+
+
+# Letakkan file android-icon-monochrome.png Anda di sini, lalu copy ke:
+# assets/images/android-icon-monochrome.png

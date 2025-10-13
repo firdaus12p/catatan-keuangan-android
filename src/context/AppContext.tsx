@@ -31,6 +31,13 @@ interface AppContextType {
   monthlyStats: { totalIncome: number; totalExpense: number };
   loadMonthlyStats: (year: number, month: number) => Promise<void>;
 
+  // Reset functions
+  resetAllData: () => Promise<void>;
+  resetTransactions: () => Promise<void>;
+  resetLoans: () => Promise<void>;
+  resetCategories: () => Promise<void>;
+  resetCategoryBalances: () => Promise<void>;
+
   // Loading states
   loading: boolean;
 
@@ -234,6 +241,81 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
+  // Reset methods
+  const resetAllData = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      await database.resetAllData();
+      await loadCategories();
+      await loadTransactions();
+      await loadLoans();
+      setMonthlyStats({ totalIncome: 0, totalExpense: 0 });
+    } catch (error) {
+      console.error("Error resetting all data:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetTransactions = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      await database.resetTransactions();
+      await loadCategories();
+      await loadTransactions();
+      setMonthlyStats({ totalIncome: 0, totalExpense: 0 });
+    } catch (error) {
+      console.error("Error resetting transactions:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetLoans = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      await database.resetLoans();
+      await loadLoans();
+    } catch (error) {
+      console.error("Error resetting loans:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetCategories = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      await database.resetCategories();
+      await loadCategories();
+      await loadTransactions();
+      await loadLoans();
+      setMonthlyStats({ totalIncome: 0, totalExpense: 0 });
+    } catch (error) {
+      console.error("Error resetting categories:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetCategoryBalances = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      await database.resetCategoryBalances();
+      await loadCategories();
+      setMonthlyStats({ totalIncome: 0, totalExpense: 0 });
+    } catch (error) {
+      console.error("Error resetting category balances:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value: AppContextType = {
     // Categories
     categories,
@@ -258,6 +340,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // Statistics
     monthlyStats,
     loadMonthlyStats,
+
+    // Reset functions
+    resetAllData,
+    resetTransactions,
+    resetLoans,
+    resetCategories,
+    resetCategoryBalances,
 
     // Loading state
     loading,

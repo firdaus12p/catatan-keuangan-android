@@ -1,0 +1,7 @@
+# Template untuk icon.png
+# Ukuran: 1024x1024 pixel
+# Format: PNG
+# Keterangan: Icon utama aplikasi
+
+# Letakkan file icon.png Anda di sini, lalu copy ke:
+# assets/images/icon.png

@@ -1,0 +1,8 @@
+# Template untuk android-icon-foreground.png
+# Ukuran: 432x432 pixel
+# Format: PNG dengan background transparan
+# Safe Zone: 288x288px di tengah
+# Keterangan: Bagian depan adaptive icon Android
+
+# Letakkan file android-icon-foreground.png Anda di sini, lalu copy ke:
+# assets/images/android-icon-foreground.png

@@ -176,6 +176,14 @@ export const HomeScreen: React.FC = () => {
             <MaterialIcons name="handshake" size={32} color="#FF9800" />
             <Text style={styles.quickActionText}>Kelola{"\n"}Pinjaman</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickActionItem, { backgroundColor: "#FFEBEE" }]}
+            onPress={() => router.push("/reset" as any)}
+          >
+            <MaterialIcons name="refresh" size={32} color="#F44336" />
+            <Text style={styles.quickActionText}>Reset{"\n"}Data</Text>
+          </TouchableOpacity>
         </View>
       </Card.Content>
     </Card>
@@ -212,7 +220,7 @@ export const HomeScreen: React.FC = () => {
               size={24}
               color="#2196F3"
             />
-            <Text style={styles.statLabel}>Total Saldo</Text>
+            <Text style={styles.statLabel}>Saldo Keseluruhan</Text>
             <Text style={styles.statValue}>{formatCurrency(totalBalance)}</Text>
           </View>
 
@@ -256,11 +264,11 @@ export const HomeScreen: React.FC = () => {
   const renderCharts = () => (
     <View>
       {/* Income vs Expense Chart */}
-      {(monthlyStats.totalIncome > 0 || monthlyStats.totalExpense > 0) && (
-        <Card style={styles.chartCard} elevation={2}>
-          <Card.Content>
-            <Text style={styles.sectionTitle}>Pemasukan & Pengeluaran</Text>
-            <View style={styles.chartContainer}>
+      <Card style={styles.chartCard} elevation={2}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Pemasukan & Pengeluaran</Text>
+          <View style={styles.chartContainer}>
+            {monthlyStats.totalIncome > 0 || monthlyStats.totalExpense > 0 ? (
               <BarChart
                 data={incomeExpenseData}
                 width={screenWidth - 64}
@@ -272,17 +280,24 @@ export const HomeScreen: React.FC = () => {
                 fromZero={true}
                 showValuesOnTopOfBars={true}
               />
-            </View>
-          </Card.Content>
-        </Card>
-      )}
+            ) : (
+              <View style={styles.emptyChartContainer}>
+                <MaterialIcons name="bar-chart" size={48} color="#CCCCCC" />
+                <Text style={styles.emptyChartText}>
+                  Data keuangan belum ada
+                </Text>
+              </View>
+            )}
+          </View>
+        </Card.Content>
+      </Card>
 
       {/* Category Balance Chart */}
-      {categoriesWithBalance.length > 0 && (
-        <Card style={styles.chartCard} elevation={2}>
-          <Card.Content>
-            <Text style={styles.sectionTitle}>Distribusi Saldo Kategori</Text>
-            <View style={styles.chartContainer}>
+      <Card style={styles.chartCard} elevation={2}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Distribusi Saldo Kategori</Text>
+          <View style={styles.chartContainer}>
+            {categoriesWithBalance.length > 0 ? (
               <PieChart
                 data={categoryBalanceData}
                 width={screenWidth - 10}
@@ -294,10 +309,17 @@ export const HomeScreen: React.FC = () => {
                 center={[20, 0]}
                 style={styles.chart}
               />
-            </View>
-          </Card.Content>
-        </Card>
-      )}
+            ) : (
+              <View style={styles.emptyChartContainer}>
+                <MaterialIcons name="pie-chart" size={48} color="#CCCCCC" />
+                <Text style={styles.emptyChartText}>
+                  Data keuangan belum ada
+                </Text>
+              </View>
+            )}
+          </View>
+        </Card.Content>
+      </Card>
     </View>
   );
 
@@ -310,6 +332,12 @@ export const HomeScreen: React.FC = () => {
           titleStyle={styles.headerTitle}
           subtitleStyle={styles.headerSubtitle}
         />
+        <Appbar.Action
+          icon="cog"
+          iconColor="#FFFFFF"
+          onPress={() => router.push("/reset" as any)}
+          style={{ marginTop: -20 }}
+        />
       </Appbar.Header>
 
       <ScrollView
@@ -317,7 +345,6 @@ export const HomeScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {renderQuickActions()}
         {renderFinancialSummary()}
         {renderCharts()}
       </ScrollView>
@@ -370,7 +397,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   quickActionItem: {
-    width: "47%",
+    width: "30%",
     aspectRatio: 1,
     borderRadius: 12,
     justifyContent: "center",
@@ -439,5 +466,16 @@ const styles = StyleSheet.create({
   chart: {
     marginVertical: 8,
     borderRadius: 16,
+  },
+  emptyChartContainer: {
+    height: 200,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyChartText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#999999",
+    textAlign: "center",
   },
 });

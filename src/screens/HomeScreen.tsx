@@ -94,6 +94,10 @@ export const HomeScreen: React.FC = () => {
     datasets: [
       {
         data: [monthlyStats.totalIncome || 1, monthlyStats.totalExpense || 1],
+        colors: [
+          (opacity = 1) => `rgba(76, 175, 80, ${opacity})`, // Hijau untuk Pemasukan
+          (opacity = 1) => `rgba(244, 67, 54, ${opacity})`, // Merah untuk Pengeluaran
+        ],
       },
     ],
   };
@@ -255,7 +259,7 @@ export const HomeScreen: React.FC = () => {
       {(monthlyStats.totalIncome > 0 || monthlyStats.totalExpense > 0) && (
         <Card style={styles.chartCard} elevation={2}>
           <Card.Content>
-            <Text style={styles.sectionTitle}>Pemasukan vs Pengeluaran</Text>
+            <Text style={styles.sectionTitle}>Pemasukan & Pengeluaran</Text>
             <View style={styles.chartContainer}>
               <BarChart
                 data={incomeExpenseData}

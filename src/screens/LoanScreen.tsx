@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -15,9 +15,7 @@ import {
   Button,
   Card,
   Chip,
-  Divider,
   IconButton,
-  Menu,
   Modal,
   Portal,
   RadioButton,
@@ -32,8 +30,6 @@ import { formatCurrency, parseCurrency } from "../utils/formatCurrency";
 interface LoanItemProps {
   loan: Loan;
   categories: any[];
-  isMenuVisible: boolean;
-  onToggleMenu: (loanId: number) => void;
   onUpdateStatus: (
     id: number,
     status: "unpaid" | "half" | "paid",
@@ -45,8 +41,6 @@ interface LoanItemProps {
 const LoanItem: React.FC<LoanItemProps> = ({
   loan,
   categories,
-  isMenuVisible,
-  onToggleMenu,
   onUpdateStatus,
   onDelete,
 }) => {
@@ -84,15 +78,21 @@ const LoanItem: React.FC<LoanItemProps> = ({
   };
 
   const handleMarkPaid = () => {
-    onToggleMenu(loan.id!);
     Alert.alert("Konfirmasi", `Tandai pinjaman ${loan.name} sebagai lunas?`, [
-      { text: "Batal", style: "cancel" },
-      { text: "Ya", onPress: () => onUpdateStatus(loan.id!, "paid") },
+      {
+        text: "Batal",
+        style: "cancel",
+      },
+      {
+        text: "Ya",
+        onPress: () => {
+          onUpdateStatus(loan.id!, "paid");
+        },
+      },
     ]);
   };
 
   const handlePartialPayment = () => {
-    onToggleMenu(loan.id!);
     setRepaymentAmount("");
     setRepaymentModalVisible(true);
   };
@@ -109,16 +109,20 @@ const LoanItem: React.FC<LoanItemProps> = ({
   };
 
   const handleDelete = () => {
-    onToggleMenu(loan.id!);
     Alert.alert(
       "Hapus Pinjaman",
       `Apakah Anda yakin ingin menghapus pinjaman ${loan.name}?`,
       [
-        { text: "Batal", style: "cancel" },
+        {
+          text: "Batal",
+          style: "cancel",
+        },
         {
           text: "Hapus",
           style: "destructive",
-          onPress: () => onDelete(loan.id!),
+          onPress: () => {
+            onDelete(loan.id!);
+          },
         },
       ]
     );
@@ -147,29 +151,34 @@ const LoanItem: React.FC<LoanItemProps> = ({
                 {getStatusText(loan.status)}
               </Chip>
 
-              {loan.status !== "paid" && (
-                <Menu
-                  key={`menu-${loan.id}`}
-                  visible={isMenuVisible}
-                  onDismiss={() => onToggleMenu(loan.id!)}
-                  anchor={
+              {/* Action Buttons */}
+              <View style={styles.actionButtons}>
+                {loan.status !== "paid" && (
+                  <>
                     <IconButton
-                      icon="dots-vertical"
-                      onPress={() => onToggleMenu(loan.id!)}
-                      disabled={false}
+                      icon="check-circle"
+                      iconColor="#4CAF50"
+                      size={20}
+                      onPress={handleMarkPaid}
+                      style={styles.actionButton}
                     />
-                  }
-                  anchorPosition="bottom"
-                >
-                  <Menu.Item onPress={handleMarkPaid} title="Tandai Lunas" />
-                  <Menu.Item
-                    onPress={handlePartialPayment}
-                    title="Bayar Sebagian"
-                  />
-                  <Divider />
-                  <Menu.Item onPress={handleDelete} title="Hapus" />
-                </Menu>
-              )}
+                    <IconButton
+                      icon="pencil"
+                      iconColor="#FF9800"
+                      size={20}
+                      onPress={handlePartialPayment}
+                      style={styles.actionButton}
+                    />
+                  </>
+                )}
+                <IconButton
+                  icon="delete"
+                  iconColor="#F44336"
+                  size={20}
+                  onPress={handleDelete}
+                  style={styles.actionButton}
+                />
+              </View>
             </View>
           </View>
 
@@ -227,6 +236,8 @@ const LoanItem: React.FC<LoanItemProps> = ({
   );
 };
 
+LoanItem.displayName = "LoanItem";
+
 export const LoanScreen: React.FC = () => {
   const {
     categories,
@@ -242,7 +253,6 @@ export const LoanScreen: React.FC = () => {
   const router = useRouter();
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<
     "all" | "unpaid" | "half" | "paid"
   >("all");
@@ -266,25 +276,20 @@ export const LoanScreen: React.FC = () => {
     React.useCallback(() => {
       loadCategories();
       loadLoans();
+
+      // Cleanup function saat screen blur/unfocus
+      return () => {
+        console.log("LoanScreen blur - closing all menus");
+      };
     }, [])
   );
 
-  // Reset activeMenuId saat component unmount atau loans berubah
+  // Cleanup placeholder (dipertahankan untuk konsistensi hook)
   useEffect(() => {
     return () => {
-      setActiveMenuId(null);
+      // no specific teardown needed
     };
   }, []);
-
-  useEffect(() => {
-    // Reset menu jika loan yang memiliki menu aktif sudah tidak ada
-    if (activeMenuId !== null) {
-      const loanExists = loans.some((loan) => loan.id === activeMenuId);
-      if (!loanExists) {
-        setActiveMenuId(null);
-      }
-    }
-  }, [loans, activeMenuId]);
 
   const resetForm = () => {
     setFormData({
@@ -302,21 +307,6 @@ export const LoanScreen: React.FC = () => {
   const closeModal = () => {
     setModalVisible(false);
     resetForm();
-  };
-
-  const handleToggleMenu = (loanId: number) => {
-    // Prevent rapid toggles
-    setTimeout(() => {
-      setActiveMenuId((prevId) => {
-        // Jika menu sudah terbuka untuk loan ini, tutup
-        if (prevId === loanId) {
-          return null;
-        } else {
-          // Buka menu untuk loan ini (tutup yang lain)
-          return loanId;
-        }
-      });
-    }, 10); // Small delay to prevent race conditions
   };
 
   const validateForm = (): boolean => {
@@ -374,29 +364,35 @@ export const LoanScreen: React.FC = () => {
     }
   };
 
-  const handleUpdateStatus = async (
-    id: number,
-    status: "unpaid" | "half" | "paid",
-    repaymentAmount?: number
-  ) => {
-    try {
-      await updateLoanStatus(id, status, repaymentAmount);
-      Alert.alert("Sukses", "Status pinjaman berhasil diperbarui");
-    } catch (error) {
-      Alert.alert("Error", "Gagal memperbarui status pinjaman");
-      console.error("Error updating loan status:", error);
-    }
-  };
+  const handleUpdateStatus = useCallback(
+    async (
+      id: number,
+      status: "unpaid" | "half" | "paid",
+      repaymentAmount?: number
+    ) => {
+      try {
+        await updateLoanStatus(id, status, repaymentAmount);
+        Alert.alert("Sukses", "Status pinjaman berhasil diperbarui");
+      } catch (error) {
+        Alert.alert("Error", "Gagal memperbarui status pinjaman");
+        console.error("Error updating loan status:", error);
+      }
+    },
+    [updateLoanStatus]
+  );
 
-  const handleDelete = async (id: number) => {
-    try {
-      await deleteLoan(id);
-      Alert.alert("Sukses", "Pinjaman berhasil dihapus");
-    } catch (error) {
-      Alert.alert("Error", "Gagal menghapus pinjaman");
-      console.error("Error deleting loan:", error);
-    }
-  };
+  const handleDelete = useCallback(
+    async (id: number) => {
+      try {
+        await deleteLoan(id);
+        Alert.alert("Sukses", "Pinjaman berhasil dihapus");
+      } catch (error) {
+        Alert.alert("Error", "Gagal menghapus pinjaman");
+        console.error("Error deleting loan:", error);
+      }
+    },
+    [deleteLoan]
+  );
 
   // Filter loans berdasarkan status
   const filteredLoans =
@@ -480,15 +476,16 @@ export const LoanScreen: React.FC = () => {
     </View>
   );
 
-  const renderLoanItem = ({ item }: { item: Loan }) => (
-    <LoanItem
-      loan={item}
-      categories={categories}
-      isMenuVisible={activeMenuId === item.id}
-      onToggleMenu={handleToggleMenu}
-      onUpdateStatus={handleUpdateStatus}
-      onDelete={handleDelete}
-    />
+  const renderLoanItem = useCallback(
+    ({ item }: { item: Loan }) => (
+      <LoanItem
+        loan={item}
+        categories={categories}
+        onUpdateStatus={handleUpdateStatus}
+        onDelete={handleDelete}
+      />
+    ),
+    [categories, handleUpdateStatus, handleDelete]
   );
 
   return (
@@ -600,6 +597,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#2196F3",
     elevation: 4,
+    height: 50,
+    minHeight: 50,
   },
   headerTitle: {
     color: "#FFFFFF",
@@ -607,7 +606,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   listContainer: {
-    paddingBottom: 100,
+    paddingBottom: 75,
   },
   filterContainer: {
     padding: 16,
@@ -782,5 +781,14 @@ const styles = StyleSheet.create({
     color: "#666666",
     marginBottom: 16,
     textAlign: "center",
+  },
+  actionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  actionButton: {
+    margin: 0,
+    marginLeft: 4,
   },
 });

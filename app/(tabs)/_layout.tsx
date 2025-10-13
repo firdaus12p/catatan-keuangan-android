@@ -16,13 +16,22 @@ export default function TabLayout() {
             backgroundColor: "#FFFFFF",
             borderTopWidth: 1,
             borderTopColor: "#E0E0E0",
-            height: 60,
-            paddingBottom: 8,
+            height: 65,
+            paddingBottom: 12,
             paddingTop: 8,
+            paddingHorizontal: 10,
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
           },
           tabBarLabelStyle: {
             fontSize: 12,
             fontWeight: "500",
+            marginBottom: 4,
+          },
+          tabBarIconStyle: {
+            marginTop: 2,
           },
         }}
       >

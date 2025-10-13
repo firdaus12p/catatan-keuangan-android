@@ -302,7 +302,7 @@ export const HomeScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
         <Appbar.Content
-          title="💸 CatatKu"
+          title="💸 Kemenku"
           subtitle="Aplikasi Catatan Keuangan"
           titleStyle={styles.headerTitle}
           subtitleStyle={styles.headerSubtitle}
@@ -330,6 +330,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#2196F3",
     elevation: 4,
+    height: 50,
+    minHeight: 50,
   },
   headerTitle: {
     color: "#FFFFFF",
@@ -344,7 +346,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 75,
   },
   sectionTitle: {
     fontSize: 18,

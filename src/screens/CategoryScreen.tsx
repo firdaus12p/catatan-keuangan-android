@@ -298,6 +298,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#2196F3",
     elevation: 4,
+    height: 50,
+    minHeight: 50,
   },
   headerTitle: {
     color: "#FFFFFF",
@@ -305,7 +307,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   listContainer: {
-    paddingBottom: 100,
+    paddingBottom: 75,
   },
   summaryContainer: {
     margin: 16,

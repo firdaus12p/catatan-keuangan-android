@@ -281,14 +281,13 @@ export const HomeScreen: React.FC = () => {
             <View style={styles.chartContainer}>
               <PieChart
                 data={categoryBalanceData}
-                width={screenWidth - 64}
+                width={screenWidth - 10}
                 height={200}
                 chartConfig={chartConfig}
                 accessor="population"
                 backgroundColor="transparent"
-                paddingLeft="15"
-                center={[10, 50]}
-                absolute
+                paddingLeft="5"
+                center={[20, 0]}
                 style={styles.chart}
               />
             </View>
@@ -330,12 +329,13 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#2196F3",
     elevation: 4,
-    height: 50,
-    minHeight: 50,
+    height: 20,
+    minHeight: 10,
   },
   headerTitle: {
     color: "#FFFFFF",
     fontSize: 22,
+    marginTop: -25,
     fontWeight: "bold",
   },
   headerSubtitle: {
@@ -429,6 +429,8 @@ const styles = StyleSheet.create({
   chartContainer: {
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
   chart: {
     marginVertical: 8,

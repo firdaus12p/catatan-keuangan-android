@@ -93,7 +93,7 @@ export const FloatingActionButtons: React.FC = () => {
 
 const styles = StyleSheet.create({
   fabGroup: {
-    paddingBottom: 80, // Memberikan ruang agar tidak menutupi tab navigation
+    paddingBottom: 95, // Memberikan ruang agar tidak menutupi tab navigation
   },
   fab: {
     backgroundColor: "#2196F3",

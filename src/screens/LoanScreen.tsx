@@ -597,12 +597,13 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#2196F3",
     elevation: 4,
-    height: 50,
-    minHeight: 50,
+    height: 20,
+    minHeight: 10,
   },
   headerTitle: {
     color: "#FFFFFF",
-    fontSize: 20,
+    fontSize: 22,
+    marginTop: -25,
     fontWeight: "bold",
   },
   listContainer: {

@@ -31,14 +31,3 @@ export const parseNumberInput = (value: string): number => {
   const numbers = value.replace(/[^\d]/g, "");
   return parseInt(numbers) || 0;
 };
-
-// Parse string currency menjadi number
-export const parseCurrency = (currencyString: string): number => {
-  // Hilangkan semua karakter non-digit kecuali koma dan titik
-  const cleanString = currencyString.replace(/[^\d.,]/g, "");
-
-  // Ganti koma dengan titik jika ada
-  const normalizedString = cleanString.replace(",", ".");
-
-  return parseFloat(normalizedString) || 0;
-};

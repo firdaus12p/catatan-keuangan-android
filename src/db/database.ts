@@ -339,48 +339,42 @@ class Database {
         finalRepaymentAmount = loan.amount;
       }
 
-      await this.db.runAsync("UPDATE loans SET status = ? WHERE id = ?", [
-        finalStatus,
-        id,
-      ]);
-
-      // Kembalikan uang ke kategori sesuai status dan catat transaksi
+      // Kembalikan uang ke kategori sesuai status
       if (finalStatus === "paid") {
-        // Lunas - kembalikan semua uang
+        // Lunas - kembalikan sisa jumlah pinjaman
         await this.db.runAsync(
           "UPDATE categories SET balance = balance + ? WHERE id = ?",
           [loan.amount, loan.category_id]
         );
 
-        // Catat sebagai transaksi pemasukan
+        // Update status dan amount pinjaman menjadi 0
         await this.db.runAsync(
-          "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
-          [
-            "income",
-            loan.amount,
-            loan.category_id,
-            `Pelunasan pinjaman dari: ${loan.name}`,
-            new Date().toISOString(),
-          ]
+          "UPDATE loans SET status = ?, amount = 0 WHERE id = ?",
+          [finalStatus, id]
         );
+
+        // TIDAK mencatat sebagai transaksi income/expense karena ini hanya pengembalian saldo internal
       } else if (finalStatus === "half" && finalRepaymentAmount > 0) {
-        // Bayar sebagian - kembalikan sebagian uang
+        // Bayar sebagian - kembalikan sebagian uang dan kurangi jumlah pinjaman
         await this.db.runAsync(
           "UPDATE categories SET balance = balance + ? WHERE id = ?",
           [finalRepaymentAmount, loan.category_id]
         );
 
-        // Catat sebagai transaksi pemasukan
+        // Update amount pinjaman (kurangi dengan jumlah yang dibayar)
+        const newLoanAmount = loan.amount - finalRepaymentAmount;
         await this.db.runAsync(
-          "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
-          [
-            "income",
-            finalRepaymentAmount,
-            loan.category_id,
-            `Pembayaran sebagian pinjaman dari: ${loan.name} (${finalRepaymentAmount}/${loan.amount})`,
-            new Date().toISOString(),
-          ]
+          "UPDATE loans SET status = ?, amount = ? WHERE id = ?",
+          [finalStatus, newLoanAmount, id]
         );
+
+        // TIDAK mencatat sebagai transaksi income/expense karena ini hanya pengembalian saldo internal
+      } else {
+        // Hanya update status tanpa perubahan lain
+        await this.db.runAsync("UPDATE loans SET status = ? WHERE id = ?", [
+          finalStatus,
+          id,
+        ]);
       }
     } catch (error) {
       console.error("Error updating loan status:", error);

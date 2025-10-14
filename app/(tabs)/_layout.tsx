@@ -1,12 +1,11 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
-import { PaperProvider } from "react-native-paper";
 import { FloatingActionButtons } from "../../src/components/FloatingActionButtons";
 
 export default function TabLayout() {
   return (
-    <PaperProvider>
+    <>
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: "#2196F3",
@@ -73,6 +72,6 @@ export default function TabLayout() {
         />
       </Tabs>
       <FloatingActionButtons />
-    </PaperProvider>
+    </>
   );
 }

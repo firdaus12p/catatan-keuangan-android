@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
+  Modal as RNModal,
   ScrollView,
   StyleSheet,
   Text,
@@ -431,6 +432,15 @@ export const LoanScreen: React.FC = () => {
     [getLoanPayments]
   );
 
+  const handleClosePaymentHistory = useCallback(() => {
+    setPaymentHistoryVisible(false);
+    // Add small delay to ensure smooth transition
+    setTimeout(() => {
+      setPaymentHistory([]);
+      setSelectedLoanName("");
+    }, 300);
+  }, []);
+
   // Filter loans berdasarkan status
   const filteredLoans =
     filterStatus === "all"
@@ -626,64 +636,71 @@ export const LoanScreen: React.FC = () => {
       </Portal>
 
       {/* Modal untuk payment history */}
-      <Portal>
-        <Modal
-          visible={paymentHistoryVisible}
-          onDismiss={() => setPaymentHistoryVisible(false)}
-          contentContainerStyle={styles.paymentHistoryModal}
-        >
-          <Text style={styles.modalTitle}>History Pembayaran</Text>
-          <Text style={styles.modalSubtitle}>Pinjaman: {selectedLoanName}</Text>
+      <RNModal
+        visible={paymentHistoryVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleClosePaymentHistory}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.paymentHistoryModal}>
+            <Text style={styles.modalTitle}>History Pembayaran</Text>
+            <Text style={styles.modalSubtitle}>
+              Pinjaman: {selectedLoanName}
+            </Text>
 
-          <ScrollView
-            style={styles.paymentList}
-            showsVerticalScrollIndicator={false}
-          >
-            {paymentHistory.length === 0 ? (
-              <View style={styles.emptyPaymentHistory}>
-                <MaterialIcons name="payment" size={48} color="#CCCCCC" />
-                <Text style={styles.emptyPaymentText}>
-                  Belum ada history pembayaran
-                </Text>
-              </View>
-            ) : (
-              paymentHistory.map((payment, index) => (
-                <Card key={payment.id || index} style={styles.paymentCard}>
-                  <Card.Content>
-                    <View style={styles.paymentHeader}>
-                      <View style={styles.paymentInfo}>
-                        <Text style={styles.paymentDate}>
-                          {formatDate(payment.payment_date)}
-                        </Text>
-                        <Text style={styles.paymentAmount}>
-                          {formatCurrency(payment.amount)}
-                        </Text>
-                      </View>
-                      <Chip
-                        icon="check-circle"
-                        style={styles.paymentStatusChip}
-                        textStyle={{ color: "#4CAF50" }}
-                      >
-                        Dibayar
-                      </Chip>
-                    </View>
-                  </Card.Content>
-                </Card>
-              ))
-            )}
-          </ScrollView>
-
-          <View style={styles.modalActions}>
-            <Button
-              mode="contained"
-              onPress={() => setPaymentHistoryVisible(false)}
-              style={styles.fullButton}
+            <ScrollView
+              style={styles.paymentList}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
+              contentContainerStyle={{ flexGrow: 1 }}
             >
-              Tutup
-            </Button>
+              {paymentHistory.length === 0 ? (
+                <View style={styles.emptyPaymentHistory}>
+                  <MaterialIcons name="payment" size={48} color="#CCCCCC" />
+                  <Text style={styles.emptyPaymentText}>
+                    Belum ada history pembayaran
+                  </Text>
+                </View>
+              ) : (
+                paymentHistory.map((payment, index) => (
+                  <Card key={payment.id || index} style={styles.paymentCard}>
+                    <Card.Content>
+                      <View style={styles.paymentHeader}>
+                        <View style={styles.paymentInfo}>
+                          <Text style={styles.paymentDate}>
+                            {formatDate(payment.payment_date)}
+                          </Text>
+                          <Text style={styles.paymentAmount}>
+                            {formatCurrency(payment.amount)}
+                          </Text>
+                        </View>
+                        <Chip
+                          icon="check-circle"
+                          style={styles.paymentStatusChip}
+                          textStyle={{ color: "#4CAF50" }}
+                        >
+                          Dibayar
+                        </Chip>
+                      </View>
+                    </Card.Content>
+                  </Card>
+                ))
+              )}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Button
+                mode="contained"
+                onPress={handleClosePaymentHistory}
+                style={styles.fullButton}
+              >
+                Tutup
+              </Button>
+            </View>
           </View>
-        </Modal>
-      </Portal>
+        </View>
+      </RNModal>
     </SafeAreaView>
   );
 };
@@ -893,14 +910,20 @@ const styles = StyleSheet.create({
   },
   paymentHistoryModal: {
     backgroundColor: "#FFFFFF",
-    padding: 24,
+    padding: 20, // Reduced padding for more compact design
     margin: 20,
     borderRadius: 12,
-    maxHeight: "80%",
+    maxHeight: "65%", // Reduced from 80% to 65%
+    elevation: 0, // Remove elevation to prevent border artifacts
+    shadowOpacity: 0, // Remove shadow for iOS
+    borderWidth: 0, // Explicitly remove any border
+    borderColor: "transparent", // Make sure border is transparent
+    overflow: "hidden", // Clip any overflow content
   },
   paymentList: {
-    maxHeight: 400,
-    marginVertical: 16,
+    maxHeight: 300, // Reduced from 400 to 300
+    marginVertical: 12, // Reduced from 16 to 12 for more compact design
+    borderWidth: 0, // Remove any border
   },
   emptyPaymentHistory: {
     alignItems: "center",
@@ -917,6 +940,11 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     borderRadius: 8,
     backgroundColor: "#F8F9FA",
+    elevation: 0, // Remove elevation to prevent border artifacts
+    shadowOpacity: 0, // Remove shadow for iOS
+    borderWidth: 0, // Remove any border
+    borderColor: "transparent", // Make sure border is transparent
+    overflow: "hidden", // Clip any overflow content
   },
   paymentHeader: {
     flexDirection: "row",
@@ -941,5 +969,12 @@ const styles = StyleSheet.create({
   },
   fullButton: {
     width: "100%",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
 });

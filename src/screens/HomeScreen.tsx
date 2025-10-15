@@ -33,6 +33,8 @@ export const HomeScreen: React.FC = () => {
     "current"
   );
   const [isInitialized, setIsInitialized] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
 
   // Initialize app dan load data
   useFocusEffect(
@@ -61,6 +63,21 @@ export const HomeScreen: React.FC = () => {
 
       initApp();
     }, [selectedPeriod, isInitialized])
+  );
+
+  // Auto-select top 2 categories with highest balance as default
+  useFocusEffect(
+    React.useCallback(() => {
+      if (categories.length > 0 && selectedCategoryIds.length === 0) {
+        const topCategories = categories
+          .filter((cat) => cat.balance > 0 && cat.id)
+          .sort((a, b) => b.balance - a.balance)
+          .slice(0, 2)
+          .map((cat) => cat.id!);
+
+        setSelectedCategoryIds(topCategories);
+      }
+    }, [categories])
   );
 
   const handlePeriodChange = async (period: "current" | "previous") => {
@@ -135,6 +152,25 @@ export const HomeScreen: React.FC = () => {
     style: {
       borderRadius: 16,
     },
+  };
+
+  // Helper functions untuk kategori selector
+  const handleCategoryToggle = (categoryId: number) => {
+    setSelectedCategoryIds((prev) => {
+      const isSelected = prev.includes(categoryId);
+      if (isSelected) {
+        return prev.filter((id) => id !== categoryId);
+      } else if (prev.length < 2) {
+        return [...prev, categoryId];
+      }
+      return prev;
+    });
+  };
+
+  const getSelectedCategories = () => {
+    return categories.filter(
+      (cat) => cat.id && selectedCategoryIds.includes(cat.id)
+    );
   };
 
   const renderQuickActions = () => (
@@ -264,6 +300,111 @@ export const HomeScreen: React.FC = () => {
     </Card>
   );
 
+  const renderCategoryBalances = () => {
+    const selectedCategories = getSelectedCategories();
+
+    return (
+      <Card style={styles.summaryCard} elevation={2}>
+        <Card.Content>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Saldo Kategori</Text>
+            <TouchableOpacity
+              onPress={() => setShowCategorySelector(!showCategorySelector)}
+              style={styles.settingsButton}
+            >
+              <MaterialIcons
+                name={showCategorySelector ? "expand-less" : "settings"}
+                size={24}
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Category Selector */}
+          {showCategorySelector && (
+            <View style={styles.categorySelector}>
+              <Text style={styles.selectorLabel}>
+                Pilih maksimal 2 kategori:
+              </Text>
+              <View style={styles.categoryChips}>
+                {categories.map((category) => (
+                  <Chip
+                    key={category.id}
+                    selected={
+                      category.id
+                        ? selectedCategoryIds.includes(category.id)
+                        : false
+                    }
+                    onPress={() =>
+                      category.id && handleCategoryToggle(category.id)
+                    }
+                    style={styles.categoryChip}
+                    disabled={
+                      !selectedCategoryIds.includes(category.id || 0) &&
+                      selectedCategoryIds.length >= 2
+                    }
+                  >
+                    {category.name}
+                  </Chip>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Selected Categories Display */}
+          {selectedCategories.length > 0 ? (
+            <View>
+              {/* Total Gabungan */}
+              {selectedCategories.length === 2 && (
+                <View style={styles.totalCombinedCard}>
+                  <MaterialIcons name="functions" size={24} color="#2196F3" />
+                  <Text style={styles.totalCombinedLabel}>Total Gabungan</Text>
+                  <Text style={styles.totalCombinedValue}>
+                    {formatCurrency(
+                      selectedCategories.reduce(
+                        (sum, cat) => sum + cat.balance,
+                        0
+                      )
+                    )}
+                  </Text>
+                </View>
+              )}
+
+              {/* Individual Categories */}
+              <View style={styles.selectedCategoriesGrid}>
+                {selectedCategories.map((category) => (
+                  <View key={category.id} style={styles.categoryBalanceItem}>
+                    <MaterialIcons
+                      name="account-balance-wallet"
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.categoryBalanceLabel} numberOfLines={1}>
+                      {category.name}
+                    </Text>
+                    <Text style={styles.categoryBalanceValue}>
+                      {formatCurrency(category.balance)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="info" size={48} color="#CCC" />
+              <Text style={styles.emptyStateText}>
+                Pilih kategori untuk melihat saldo
+              </Text>
+              <Text style={styles.emptyStateSubtext}>
+                Tekan ikon pengaturan di atas untuk memilih kategori
+              </Text>
+            </View>
+          )}
+        </Card.Content>
+      </Card>
+    );
+  };
+
   const renderCharts = () => (
     <View>
       {/* Income vs Expense Chart */}
@@ -349,6 +490,7 @@ export const HomeScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
       >
         {renderFinancialSummary()}
+        {renderCategoryBalances()}
         {renderCharts()}
       </ScrollView>
     </SafeAreaView>
@@ -479,6 +621,99 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: "#999999",
+    textAlign: "center",
+  },
+  // Category Balances Styles
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  settingsButton: {
+    padding: 4,
+  },
+  categorySelector: {
+    marginBottom: 16,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+  },
+  selectorLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 8,
+  },
+  categoryChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  categoryChip: {
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  totalCombinedCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    backgroundColor: "#E3F2FD",
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  totalCombinedLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1976D2",
+    marginLeft: 8,
+    flex: 1,
+  },
+  totalCombinedValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#1565C0",
+  },
+  selectedCategoriesGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    gap: 12,
+  },
+  categoryBalanceItem: {
+    flex: 1,
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#F8F8F8",
+    borderRadius: 12,
+    minHeight: 80,
+  },
+  categoryBalanceLabel: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  categoryBalanceValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 32,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: "#999",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  emptyStateSubtext: {
+    fontSize: 12,
+    color: "#CCC",
+    marginTop: 4,
     textAlign: "center",
   },
 });

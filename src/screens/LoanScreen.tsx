@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
   Button,
@@ -28,7 +29,7 @@ import { Category, Loan, LoanPayment } from "../db/database";
 import { formatDate, getTodayString } from "../utils/dateHelper";
 import {
   formatCurrency,
-  formatNumberInput,
+  formatNumberInputWithCursor,
   parseNumberInput,
 } from "../utils/formatCurrency";
 
@@ -51,6 +52,7 @@ const LoanItem: React.FC<LoanItemProps> = ({
   onDelete,
   onViewPayments,
 }) => {
+  const paymentAmountInputRef = useRef<any>(null);
   const [repaymentModalVisible, setRepaymentModalVisible] = useState(false);
   const [repaymentAmount, setRepaymentAmount] = useState("");
 
@@ -214,41 +216,67 @@ const LoanItem: React.FC<LoanItemProps> = ({
           onDismiss={() => setRepaymentModalVisible(false)}
           contentContainerStyle={styles.repaymentModal}
         >
-          <Text style={styles.modalTitle}>Pembayaran Sebagian</Text>
-          <Text style={styles.modalSubtitle}>
-            Pinjaman: {loan.name} ({formatCurrency(loan.amount)})
-          </Text>
+          <KeyboardAwareScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollViewContent}
+            keyboardShouldPersistTaps="handled"
+            enableOnAndroid={true}
+            enableAutomaticScroll={true}
+            extraHeight={100}
+            extraScrollHeight={100}
+          >
+            <Text style={styles.modalTitle}>Pembayaran Sebagian</Text>
+            <Text style={styles.modalSubtitle}>
+              Pinjaman: {loan.name} ({formatCurrency(loan.amount)})
+            </Text>
 
-          <TextInput
-            label="Jumlah Pembayaran"
-            value={repaymentAmount}
-            onChangeText={(text) => {
-              const formatted = formatNumberInput(text);
-              setRepaymentAmount(formatted);
-            }}
-            style={styles.input}
-            mode="outlined"
-            keyboardType="numeric"
-            placeholder={`Maksimal: ${formatCurrency(loan.amount)}`}
-            left={<TextInput.Affix text="Rp " />}
-          />
+            <TextInput
+              ref={paymentAmountInputRef}
+              label="Jumlah Pembayaran"
+              value={repaymentAmount}
+              onChangeText={(text) => {
+                const selection =
+                  paymentAmountInputRef.current?.getSelection?.() || {
+                    start: text.length,
+                    end: text.length,
+                  };
 
-          <View style={styles.modalActions}>
-            <Button
+                const { formattedValue, cursorPosition } =
+                  formatNumberInputWithCursor(text, selection.start);
+
+                setRepaymentAmount(formattedValue);
+
+                // Set cursor position setelah state update
+                setTimeout(() => {
+                  paymentAmountInputRef.current?.setNativeProps({
+                    selection: { start: cursorPosition, end: cursorPosition },
+                  });
+                }, 0);
+              }}
+              style={styles.input}
               mode="outlined"
-              onPress={() => setRepaymentModalVisible(false)}
-              style={styles.button}
-            >
-              Batal
-            </Button>
-            <Button
-              mode="contained"
-              onPress={handleConfirmPartialPayment}
-              style={styles.button}
-            >
-              Konfirmasi
-            </Button>
-          </View>
+              keyboardType="numeric"
+              placeholder={`Maksimal: ${formatCurrency(loan.amount)}`}
+              left={<TextInput.Affix text="Rp " />}
+            />
+
+            <View style={styles.modalActions}>
+              <Button
+                mode="outlined"
+                onPress={() => setRepaymentModalVisible(false)}
+                style={styles.button}
+              >
+                Batal
+              </Button>
+              <Button
+                mode="contained"
+                onPress={handleConfirmPartialPayment}
+                style={styles.button}
+              >
+                Konfirmasi
+              </Button>
+            </View>
+          </KeyboardAwareScrollView>
         </Modal>
       </Portal>
     </>
@@ -279,6 +307,11 @@ export const LoanScreen: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<
     "all" | "unpaid" | "half" | "paid"
   >("all");
+
+  // Refs untuk cursor management
+  const loanAmountInputRef = useRef<any>(null);
+  const paymentAmountInputRef = useRef<any>(null);
+
   const [formData, setFormData] = useState({
     name: "",
     amount: "",
@@ -567,7 +600,15 @@ export const LoanScreen: React.FC = () => {
           onDismiss={closeModal}
           contentContainerStyle={styles.modalContainer}
         >
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <KeyboardAwareScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollViewContent}
+            keyboardShouldPersistTaps="handled"
+            enableOnAndroid={true}
+            enableAutomaticScroll={true}
+            extraHeight={100}
+            extraScrollHeight={100}
+          >
             <Text style={styles.modalTitle}>Tambah Pinjaman Baru</Text>
 
             <TextInput
@@ -580,11 +621,27 @@ export const LoanScreen: React.FC = () => {
             />
 
             <TextInput
+              ref={loanAmountInputRef}
               label="Jumlah Pinjaman"
               value={formData.amount}
               onChangeText={(text) => {
-                const formatted = formatNumberInput(text);
-                setFormData({ ...formData, amount: formatted });
+                const selection =
+                  loanAmountInputRef.current?.getSelection?.() || {
+                    start: text.length,
+                    end: text.length,
+                  };
+
+                const { formattedValue, cursorPosition } =
+                  formatNumberInputWithCursor(text, selection.start);
+
+                setFormData({ ...formData, amount: formattedValue });
+
+                // Set cursor position setelah state update
+                setTimeout(() => {
+                  loanAmountInputRef.current?.setNativeProps({
+                    selection: { start: cursorPosition, end: cursorPosition },
+                  });
+                }, 0);
               }}
               style={styles.input}
               mode="outlined"
@@ -631,7 +688,7 @@ export const LoanScreen: React.FC = () => {
                 Tambah
               </Button>
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </Modal>
       </Portal>
 
@@ -840,7 +897,12 @@ const styles = StyleSheet.create({
     padding: 24,
     margin: 20,
     borderRadius: 12,
-    maxHeight: "90%",
+    maxHeight: "80%",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   modalTitle: {
     fontSize: 20,
@@ -976,5 +1038,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
 });

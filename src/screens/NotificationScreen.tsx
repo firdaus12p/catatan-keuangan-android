@@ -215,10 +215,16 @@ export const NotificationScreen: React.FC = React.memo(() => {
       }
 
       // Kirim test notification
-      await scheduleNotification({
-        ...settings,
-        time: new Date(Date.now() + 3000).toTimeString().slice(0, 5), // 3 detik dari sekarang
-      });
+      const testTime = new Date(Date.now() + 3000);
+      const hours = testTime.getHours();
+      const minutes = testTime.getMinutes();
+
+      await scheduleNotification(
+        "Test Notifikasi Pengingat",
+        "Ini adalah test notifikasi untuk memastikan aplikasi berfungsi dengan baik",
+        hours,
+        minutes
+      );
 
       Alert.alert(
         "Test Notifikasi",

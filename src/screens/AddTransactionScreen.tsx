@@ -1,15 +1,15 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
   Button,
@@ -34,7 +34,7 @@ import {
 } from "../utils/dateHelper";
 import {
   formatCurrency,
-  formatNumberInput,
+  formatNumberInputWithCursor,
   parseNumberInput,
 } from "../utils/formatCurrency";
 
@@ -50,6 +50,9 @@ export const AddTransactionScreen: React.FC = () => {
 
   const { action } = useLocalSearchParams<{ action?: string }>();
   const router = useRouter();
+
+  // Ref untuk amount input cursor management
+  const amountInputRef = useRef<any>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">(
@@ -401,7 +404,15 @@ export const AddTransactionScreen: React.FC = () => {
           onDismiss={closeModal}
           contentContainerStyle={styles.modalContainer}
         >
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <KeyboardAwareScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollViewContent}
+            keyboardShouldPersistTaps="handled"
+            enableOnAndroid={true}
+            enableAutomaticScroll={true}
+            extraHeight={100}
+            extraScrollHeight={100}
+          >
             <Text style={styles.modalTitle}>
               Tambah{" "}
               {transactionType === "income" ? "Pemasukan" : "Pengeluaran"}
@@ -441,11 +452,26 @@ export const AddTransactionScreen: React.FC = () => {
             )}
 
             <TextInput
+              ref={amountInputRef}
               label="Jumlah"
               value={formData.amount}
               onChangeText={(text) => {
-                const formatted = formatNumberInput(text);
-                setFormData({ ...formData, amount: formatted });
+                const selection = amountInputRef.current?.getSelection?.() || {
+                  start: text.length,
+                  end: text.length,
+                };
+
+                const { formattedValue, cursorPosition } =
+                  formatNumberInputWithCursor(text, selection.start);
+
+                setFormData({ ...formData, amount: formattedValue });
+
+                // Set cursor position setelah state update
+                setTimeout(() => {
+                  amountInputRef.current?.setNativeProps({
+                    selection: { start: cursorPosition, end: cursorPosition },
+                  });
+                }, 0);
               }}
               style={styles.input}
               mode="outlined"
@@ -506,7 +532,7 @@ export const AddTransactionScreen: React.FC = () => {
                 Simpan
               </Button>
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </Modal>
       </Portal>
     </SafeAreaView>
@@ -612,7 +638,12 @@ const styles = StyleSheet.create({
     padding: 24,
     margin: 20,
     borderRadius: 12,
-    maxHeight: "90%",
+    maxHeight: "80%",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   modalTitle: {
     fontSize: 20,
@@ -682,6 +713,10 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     marginHorizontal: 8,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   historyHeader: {
     backgroundColor: "#FFFFFF",

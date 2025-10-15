@@ -91,7 +91,7 @@ export const CategoryScreen: React.FC = () => {
 
     const percentage = parseFloat(formData.percentage);
     if (isNaN(percentage) || percentage <= 0 || percentage > 100) {
-      Alert.alert("Error", "Persentase harus antara 1-100");
+      Alert.alert("Persentase alokasi tidak boleh kosong", "Persentase Alokasi harus antara 1-100%");
       return false;
     }
 

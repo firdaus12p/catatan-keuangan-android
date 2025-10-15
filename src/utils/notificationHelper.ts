@@ -173,88 +173,122 @@ const createNotificationDate = (timeString: string): Date => {
  * Jadwalkan notifikasi harian
  */
 export const scheduleNotification = async (
-  settings: NotificationSettings
+  settingsOrTitle: NotificationSettings | string,
+  body?: string,
+  hour?: number,
+  minute?: number
 ): Promise<string | null> => {
   try {
-    // Check notification support first
     const notificationModule = await getNotifications();
     if (!notificationModule) {
       throw new Error("Notifikasi tidak didukung di environment ini (Expo Go)");
     }
 
-    // Batalkan notifikasi yang sudah ada
     await cancelScheduledNotification();
 
-    if (!settings.isEnabled) {
-      return null;
+    let finalHours: number;
+    let finalMinutes: number;
+    let title: string;
+    let notificationBody: string;
+
+    // Handle overloaded parameters
+    if (typeof settingsOrTitle === "string") {
+      // Individual parameters provided for test notification
+      title = settingsOrTitle;
+      notificationBody = body || "Pengingat dari CatatKu";
+      finalHours = hour || 20;
+      finalMinutes = minute || 30;
+    } else {
+      // Settings object provided
+      const settings = settingsOrTitle;
+      if (!settings.isEnabled) {
+        return null;
+      }
+      const [hours, minutes] = settings.time.split(":").map(Number);
+      finalHours = hours;
+      finalMinutes = minutes;
+      title = "⏰ CatatKu";
+      notificationBody = "Saatnya mencatat transaksi keuangan hari ini!";
     }
 
-    // Check permission terlebih dahulu
+    // Check permission
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) {
       throw new Error("Permission denied for notifications");
     }
 
-    const [hours, minutes] = settings.time.split(":").map(Number);
-
-    let notificationId: string;
-
-    // Untuk Android, gunakan waktu relatif yang dijadwalkan ulang setiap hari
     const now = new Date();
     let nextTriggerTime = new Date();
-    nextTriggerTime.setHours(hours, minutes, 0, 0);
+    nextTriggerTime.setHours(finalHours, finalMinutes, 0, 0);
 
-    // Jika waktu sudah terlewat hari ini, jadwalkan untuk besok
-    if (nextTriggerTime <= now) {
+    // If time has passed today, schedule for tomorrow (unless it's a test notification)
+    if (nextTriggerTime <= now && typeof settingsOrTitle === "object") {
       nextTriggerTime.setDate(nextTriggerTime.getDate() + 1);
     }
 
-    const secondsUntilTrigger = Math.floor(
-      (nextTriggerTime.getTime() - now.getTime()) / 1000
-    );
+    const content = {
+      title,
+      body: notificationBody,
+      sound: true,
+      priority:
+        Platform.OS === "android"
+          ? notificationModule.AndroidImportance.HIGH
+          : undefined,
+    };
 
-    if (Platform.OS === "android") {
-      // Android menggunakan time-based trigger (dalam detik)
+    let notificationId: string;
+
+    if (Platform.OS === "ios") {
+      // iOS supports calendar triggers
       notificationId = await notificationModule.scheduleNotificationAsync({
-        content: {
-          title: "⏰ CatatKu",
-          body: "Saatnya beritahu kemenkeu pengeluaranmu hari ini",
-          sound: true,
-          priority: notificationModule.AndroidNotificationPriority.HIGH,
-        },
+        content,
         trigger: {
-          type: notificationModule.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: secondsUntilTrigger,
-          repeats: false, // Kita akan reschedule manual
+          type: notificationModule.SchedulableTriggerInputTypes.CALENDAR,
+          hour: finalHours,
+          minute: finalMinutes,
+          repeats: typeof settingsOrTitle === "object", // Only repeat for settings, not test
         },
       });
     } else {
-      // iOS bisa menggunakan calendar trigger
+      // Android: Use date trigger for more reliable delivery
       notificationId = await notificationModule.scheduleNotificationAsync({
-        content: {
-          title: "⏰ CatatKu",
-          body: "Saatnya beritahu kemenkeu pengeluaranmu hari ini",
-          sound: true,
-        },
+        content,
         trigger: {
-          type: notificationModule.SchedulableTriggerInputTypes.CALENDAR,
-          hour: hours,
-          minute: minutes,
-          repeats: true,
+          type: notificationModule.SchedulableTriggerInputTypes.DATE,
+          date: nextTriggerTime,
         },
       });
+
+      // For recurring notifications, schedule next occurrence
+      if (typeof settingsOrTitle === "object") {
+        const tomorrow = new Date(nextTriggerTime);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        await notificationModule.scheduleNotificationAsync({
+          content,
+          trigger: {
+            type: notificationModule.SchedulableTriggerInputTypes.DATE,
+            date: tomorrow,
+          },
+        });
+      }
     }
 
-    // Simpan ID notifikasi untuk referensi
     await AsyncStorage.setItem(NOTIFICATION_ID_KEY, notificationId);
 
-    console.log(
-      `Notification scheduled for ${settings.time} (${settings.timezone})`
-    );
+    // Log notification scheduled info
+    const displayTime =
+      typeof settingsOrTitle === "object"
+        ? `${settingsOrTitle.time} (${settingsOrTitle.timezone})`
+        : `${String(finalHours).padStart(2, "0")}:${String(
+            finalMinutes
+          ).padStart(2, "0")}`;
+
+    console.log(`Notification scheduled for ${displayTime}`);
 
     // Untuk Android, karena menggunakan non-repeating, setup listener untuk reschedule
-    if (Platform.OS === "android") {
-      setupNotificationListener(settings);
+    if (Platform.OS === "android" && typeof settingsOrTitle === "object") {
+      setupNotificationListener(settingsOrTitle);
     }
 
     return notificationId;

@@ -67,14 +67,24 @@ export const commonStyles = StyleSheet.create({
 });
 
 export const colors = {
-  primary: "#2196F3",
-  success: "#4CAF50",
-  error: "#F44336",
-  warning: "#FF9800",
+  primary: "#2196F3", // Blue - Main theme, Home
+  success: "#4CAF50", // Green - Income, Transaction
+  error: "#F44336", // Red - Expense, Delete actions
+  warning: "#FF9800", // Orange - Loan, Warning
+  secondary: "#9C27B0", // Purple - Category
+  info: "#607D8B", // Blue Grey - Notification, Info
   background: "#F5F5F5",
   surface: "#FFFFFF",
   text: "#333333",
   textSecondary: "#666666",
   textMuted: "#999999",
   border: "#E0E0E0",
+
+  // Semantic colors for better organization
+  income: "#4CAF50", // Green for income
+  expense: "#F44336", // Red for expense
+  loan: "#FF9800", // Orange for loan
+  category: "#9C27B0", // Purple for category
+  home: "#2196F3", // Blue for home
+  notification: "#607D8B", // Blue grey for notification
 };

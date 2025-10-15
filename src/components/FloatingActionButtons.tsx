@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { StyleSheet } from "react-native";
 import { FAB, Portal } from "react-native-paper";
+import { colors } from "../styles/commonStyles";
 
 export const FloatingActionButtons: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -43,39 +44,43 @@ export const FloatingActionButtons: React.FC = () => {
         actions={[
           {
             icon: () => (
-              <MaterialIcons name="trending-up" size={20} color="#FFFFFF" />
+              <MaterialIcons name="trending-up" size={24} color="#FFFFFF" />
             ),
             label: "Pemasukan",
             onPress: handlePemasukanPress,
-            style: { backgroundColor: "#4CAF50" },
-            labelTextColor: "#4CAF50",
+            style: { backgroundColor: colors.income }, // Green - matching transaction tab
+            labelTextColor: colors.income,
+            size: "medium",
           },
           {
             icon: () => (
-              <MaterialIcons name="trending-down" size={20} color="#FFFFFF" />
+              <MaterialIcons name="trending-down" size={24} color="#FFFFFF" />
             ),
             label: "Pengeluaran",
             onPress: handlePengeluaranPress,
-            style: { backgroundColor: "#F44336" },
-            labelTextColor: "#F44336",
+            style: { backgroundColor: colors.expense }, // Red - expense color
+            labelTextColor: colors.expense,
+            size: "medium",
           },
           {
             icon: () => (
-              <MaterialIcons name="handshake" size={20} color="#FFFFFF" />
+              <MaterialIcons name="handshake" size={24} color="#FFFFFF" />
             ),
             label: "Tambah Pinjaman",
             onPress: handlePinjamanPress,
-            style: { backgroundColor: "#FF9800" },
-            labelTextColor: "#FF9800",
+            style: { backgroundColor: colors.loan }, // Orange - matching loan tab
+            labelTextColor: colors.loan,
+            size: "medium",
           },
           {
             icon: () => (
-              <MaterialIcons name="category" size={20} color="#FFFFFF" />
+              <MaterialIcons name="category" size={24} color="#FFFFFF" />
             ),
             label: "Tambah Kategori",
             onPress: handleKategoriPress,
-            style: { backgroundColor: "#9C27B0" },
-            labelTextColor: "#9C27B0",
+            style: { backgroundColor: colors.category }, // Purple - matching category tab
+            labelTextColor: colors.category,
+            size: "medium",
           },
         ]}
         onStateChange={onStateChange}
@@ -86,6 +91,11 @@ export const FloatingActionButtons: React.FC = () => {
         }}
         fabStyle={styles.fab}
         style={styles.fabGroup}
+        theme={{
+          colors: {
+            backdrop: "rgba(0, 0, 0, 0.5)",
+          },
+        }}
       />
     </Portal>
   );
@@ -96,6 +106,14 @@ const styles = StyleSheet.create({
     paddingBottom: 95, // Memberikan ruang agar tidak menutupi tab navigation
   },
   fab: {
-    backgroundColor: "#2196F3",
+    backgroundColor: colors.primary,
+    elevation: 8, // Add more elevation for better visual
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
 });

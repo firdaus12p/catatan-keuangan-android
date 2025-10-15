@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Platform,
@@ -32,7 +32,7 @@ import {
   scheduleNotification,
 } from "../utils/notificationHelper";
 
-export const NotificationScreen: React.FC = () => {
+export const NotificationScreen: React.FC = React.memo(() => {
   const [settings, setSettings] = useState<NotificationSettings>({
     isEnabled: false,
     time: "20:30",
@@ -43,6 +43,7 @@ export const NotificationScreen: React.FC = () => {
   const [tempTime, setTempTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [hasActiveNotification, setHasActiveNotification] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Load pengaturan saat screen difokuskan
   useFocusEffect(
@@ -53,7 +54,11 @@ export const NotificationScreen: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      setLoading(true);
+      // Hanya tampilkan loading pada load pertama kali
+      if (!isInitialized) {
+        setLoading(true);
+      }
+
       const savedSettings = await loadNotificationSettings();
 
       if (savedSettings) {
@@ -78,7 +83,11 @@ export const NotificationScreen: React.FC = () => {
       console.error("Error loading notification settings:", error);
       Alert.alert("Error", "Gagal memuat pengaturan notifikasi");
     } finally {
-      setLoading(false);
+      // Hanya set loading false dan mark sebagai initialized pada load pertama
+      if (!isInitialized) {
+        setLoading(false);
+        setIsInitialized(true);
+      }
     }
   };
 
@@ -221,7 +230,26 @@ export const NotificationScreen: React.FC = () => {
     }
   };
 
-  if (loading) {
+  // Memoize status notification untuk mencegah re-calculation
+  const notificationStatus = useMemo(
+    () => ({
+      isActive: settings.isEnabled,
+      displayTime: formatTimeForDisplay(settings.time),
+      statusText: settings.isEnabled
+        ? "Notifikasi Aktif"
+        : "Notifikasi Nonaktif",
+      subtitle: settings.isEnabled
+        ? `Pengingat harian pada pukul ${formatTimeForDisplay(settings.time)}`
+        : "Tidak ada pengingat yang dijadwalkan",
+      iconName: settings.isEnabled
+        ? "notifications-active"
+        : "notifications-off",
+      iconColor: settings.isEnabled ? "#4CAF50" : "#999999",
+    }),
+    [settings.isEnabled, settings.time]
+  );
+
+  if (loading && !isInitialized) {
     return (
       <SafeAreaView style={styles.container}>
         <Appbar.Header style={styles.header}>
@@ -256,26 +284,16 @@ export const NotificationScreen: React.FC = () => {
           <Card.Content>
             <View style={styles.statusHeader}>
               <MaterialIcons
-                name={
-                  settings.isEnabled
-                    ? "notifications-active"
-                    : "notifications-off"
-                }
+                name={notificationStatus.iconName as any}
                 size={32}
-                color={settings.isEnabled ? "#4CAF50" : "#999999"}
+                color={notificationStatus.iconColor}
               />
               <View style={styles.statusInfo}>
                 <Text style={styles.statusTitle}>
-                  {settings.isEnabled
-                    ? "Notifikasi Aktif"
-                    : "Notifikasi Nonaktif"}
+                  {notificationStatus.statusText}
                 </Text>
                 <Text style={styles.statusSubtitle}>
-                  {settings.isEnabled
-                    ? `Pengingat harian pada pukul ${formatTimeForDisplay(
-                        settings.time
-                      )}`
-                    : "Tidak ada pengingat yang dijadwalkan"}
+                  {notificationStatus.subtitle}
                 </Text>
               </View>
             </View>
@@ -316,9 +334,7 @@ export const NotificationScreen: React.FC = () => {
             {/* Pengaturan Waktu */}
             <List.Item
               title="Waktu Pengingat"
-              description={`Setiap hari pada pukul ${formatTimeForDisplay(
-                settings.time
-              )}`}
+              description={`Setiap hari pada pukul ${notificationStatus.displayTime}`}
               left={(props) => (
                 <List.Icon {...props} icon="clock" color="#FF9800" />
               )}
@@ -426,7 +442,7 @@ export const NotificationScreen: React.FC = () => {
       </Portal>
     </SafeAreaView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

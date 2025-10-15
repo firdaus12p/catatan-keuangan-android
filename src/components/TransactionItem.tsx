@@ -11,51 +11,55 @@ interface TransactionItemProps {
   categories: Category[];
 }
 
-export const TransactionItem: React.FC<TransactionItemProps> = ({
-  transaction,
-  categories,
-}) => {
-  // Cari nama kategori berdasarkan category_id
-  const categoryName =
-    categories.find((cat) => cat.id === transaction.category_id)?.name ||
-    "Kategori Tidak Diketahui";
+export const TransactionItem: React.FC<TransactionItemProps> = React.memo(
+  ({ transaction, categories }) => {
+    // Cari nama kategori berdasarkan category_id
+    const categoryName =
+      categories.find((cat) => cat.id === transaction.category_id)?.name ||
+      "Kategori Tidak Diketahui";
 
-  // Tentukan warna dan icon berdasarkan tipe transaksi
-  const isIncome = transaction.type === "income";
-  const iconName = isIncome ? "trending-up" : "trending-down";
-  const amountColor = isIncome ? "#4CAF50" : "#F44336";
-  const backgroundColor = isIncome ? "#E8F5E8" : "#FFEBEE";
-  const borderColor = isIncome ? "#4CAF50" : "#F44336";
+    // Tentukan warna dan icon berdasarkan tipe transaksi
+    const isIncome = transaction.type === "income";
+    const iconName = isIncome ? "trending-up" : "trending-down";
+    const amountColor = isIncome ? "#4CAF50" : "#F44336";
+    const backgroundColor = isIncome ? "#E8F5E8" : "#FFEBEE";
+    const borderColor = isIncome ? "#4CAF50" : "#F44336";
 
-  return (
-    <Card style={[styles.card, { borderLeftColor: borderColor }]} elevation={1}>
-      <Card.Content style={styles.content}>
-        <View style={styles.leftSection}>
-          <View style={[styles.iconContainer, { backgroundColor }]}>
-            <MaterialIcons name={iconName} size={24} color={amountColor} />
+    return (
+      <Card
+        style={[styles.card, { borderLeftColor: borderColor }]}
+        elevation={1}
+      >
+        <Card.Content style={styles.content}>
+          <View style={styles.leftSection}>
+            <View style={[styles.iconContainer, { backgroundColor }]}>
+              <MaterialIcons name={iconName} size={24} color={amountColor} />
+            </View>
+
+            <View style={styles.textContainer}>
+              <Text style={styles.categoryText}>{categoryName}</Text>
+              <Text style={styles.noteText} numberOfLines={2}>
+                {transaction.note || "Tidak ada catatan"}
+              </Text>
+              <Text style={styles.dateText}>
+                {formatDate(transaction.date)}
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.textContainer}>
-            <Text style={styles.categoryText}>{categoryName}</Text>
-            <Text style={styles.noteText} numberOfLines={2}>
-              {transaction.note || "Tidak ada catatan"}
+          <View style={styles.rightSection}>
+            <Text style={[styles.amountText, { color: amountColor }]}>
+              {isIncome ? "+" : "-"} {formatCurrency(transaction.amount)}
             </Text>
-            <Text style={styles.dateText}>{formatDate(transaction.date)}</Text>
+            <Text style={styles.typeText}>
+              {isIncome ? "Pemasukan" : "Pengeluaran"}
+            </Text>
           </View>
-        </View>
-
-        <View style={styles.rightSection}>
-          <Text style={[styles.amountText, { color: amountColor }]}>
-            {isIncome ? "+" : "-"} {formatCurrency(transaction.amount)}
-          </Text>
-          <Text style={styles.typeText}>
-            {isIncome ? "Pemasukan" : "Pengeluaran"}
-          </Text>
-        </View>
-      </Card.Content>
-    </Card>
-  );
-};
+        </Card.Content>
+      </Card>
+    );
+  }
+);
 
 const styles = StyleSheet.create({
   card: {

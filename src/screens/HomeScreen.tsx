@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Dimensions,
   ScrollView,
@@ -101,46 +101,58 @@ export const HomeScreen: React.FC = () => {
   const currentMonthName = getMonthName(month);
   const previousMonthName = getMonthName(month === 1 ? 12 : month - 1);
 
-  // Hitung total saldo dari semua kategori
-  const totalBalance = categories.reduce((sum, cat) => sum + cat.balance, 0);
+  // Optimasi perhitungan dengan useMemo
+  const { totalBalance, categoriesWithBalance } = useMemo(() => {
+    const balance = categories.reduce((sum, cat) => sum + cat.balance, 0);
+    const withBalance = categories.filter((cat) => cat.balance > 0);
+    return { totalBalance: balance, categoriesWithBalance: withBalance };
+  }, [categories]);
+
   // Gunakan saldo bersih dari monthlyStats yang sudah dihitung dengan benar
   const saldoBersih = monthlyStats.saldoBersih;
 
-  // Data untuk Income vs Expense Chart
-  const incomeExpenseData = {
-    labels: ["Pemasukan", "Pengeluaran"],
-    datasets: [
-      {
-        data: [monthlyStats.totalIncome || 1, monthlyStats.totalExpense || 1],
-        colors: [
-          (opacity = 1) => `rgba(76, 175, 80, ${opacity})`, // Hijau untuk Pemasukan
-          (opacity = 1) => `rgba(244, 67, 54, ${opacity})`, // Merah untuk Pengeluaran
-        ],
-      },
-    ],
-  };
+  // Data untuk Income vs Expense Chart dengan memoization
+  const incomeExpenseData = useMemo(
+    () => ({
+      labels: ["Pemasukan", "Pengeluaran"],
+      datasets: [
+        {
+          data: [monthlyStats.totalIncome || 1, monthlyStats.totalExpense || 1],
+          colors: [
+            (opacity = 1) => `rgba(76, 175, 80, ${opacity})`, // Hijau untuk Pemasukan
+            (opacity = 1) => `rgba(244, 67, 54, ${opacity})`, // Merah untuk Pengeluaran
+          ],
+        },
+      ],
+    }),
+    [monthlyStats.totalIncome, monthlyStats.totalExpense]
+  );
 
-  // Data untuk Category Balance Chart (hanya kategori dengan saldo > 0)
-  const categoriesWithBalance = categories.filter((cat) => cat.balance > 0);
-  const categoryBalanceData =
-    categoriesWithBalance.length > 0
-      ? categoriesWithBalance.map((cat, index) => ({
-          name:
-            cat.name.length > 10 ? cat.name.substring(0, 8) + "..." : cat.name,
-          population: cat.balance,
-          color: `hsl(${(index * 60) % 360}, 50%, 50%)`,
-          legendFontColor: "#333333",
-          legendFontSize: 12,
-        }))
-      : [
-          {
-            name: "Tidak ada data",
-            population: 1,
-            color: "#CCCCCC",
-            legendFontColor: "#999999",
+  // Data untuk Category Balance Chart dengan memoization
+  const categoryBalanceData = useMemo(
+    () =>
+      categoriesWithBalance.length > 0
+        ? categoriesWithBalance.map((cat, index) => ({
+            name:
+              cat.name.length > 10
+                ? cat.name.substring(0, 8) + "..."
+                : cat.name,
+            population: cat.balance,
+            color: `hsl(${(index * 60) % 360}, 50%, 50%)`,
+            legendFontColor: "#333333",
             legendFontSize: 12,
-          },
-        ];
+          }))
+        : [
+            {
+              name: "Tidak ada data",
+              population: 1,
+              color: "#CCCCCC",
+              legendFontColor: "#999999",
+              legendFontSize: 12,
+            },
+          ],
+    [categoriesWithBalance]
+  );
 
   const chartConfig = {
     backgroundColor: "#FFFFFF",
@@ -154,8 +166,8 @@ export const HomeScreen: React.FC = () => {
     },
   };
 
-  // Helper functions untuk kategori selector
-  const handleCategoryToggle = (categoryId: number) => {
+  // Helper functions untuk kategori selector dengan useCallback
+  const handleCategoryToggle = useCallback((categoryId: number) => {
     setSelectedCategoryIds((prev) => {
       const isSelected = prev.includes(categoryId);
       if (isSelected) {
@@ -165,13 +177,13 @@ export const HomeScreen: React.FC = () => {
       }
       return prev;
     });
-  };
+  }, []);
 
-  const getSelectedCategories = () => {
+  const getSelectedCategories = useCallback(() => {
     return categories.filter(
       (cat) => cat.id && selectedCategoryIds.includes(cat.id)
     );
-  };
+  }, [categories, selectedCategoryIds]);
 
   const renderQuickActions = () => (
     <Card style={styles.quickActionsCard} elevation={2}>

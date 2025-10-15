@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -152,12 +152,12 @@ export const CategoryScreen: React.FC = () => {
     }
   };
 
-  // Hitung total saldo dan persentase
-  const totalBalance = categories.reduce((sum, cat) => sum + cat.balance, 0);
-  const totalPercentage = categories.reduce(
-    (sum, cat) => sum + cat.percentage,
-    0
-  );
+  // Hitung total saldo dan persentase dengan memoization
+  const { totalBalance, totalPercentage } = useMemo(() => {
+    const balance = categories.reduce((sum, cat) => sum + cat.balance, 0);
+    const percentage = categories.reduce((sum, cat) => sum + cat.percentage, 0);
+    return { totalBalance: balance, totalPercentage: percentage };
+  }, [categories]);
 
   const renderHeader = () => (
     <Surface style={styles.summaryContainer} elevation={1}>

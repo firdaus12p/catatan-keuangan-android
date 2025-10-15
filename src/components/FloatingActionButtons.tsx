@@ -5,7 +5,7 @@ import { StyleSheet } from "react-native";
 import { FAB, Portal } from "react-native-paper";
 import { colors } from "../styles/commonStyles";
 
-export const FloatingActionButtons: React.FC = () => {
+export const FloatingActionButtons: React.FC = React.memo(() => {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
@@ -99,7 +99,7 @@ export const FloatingActionButtons: React.FC = () => {
       />
     </Portal>
   );
-};
+});
 
 const styles = StyleSheet.create({
   fabGroup: {

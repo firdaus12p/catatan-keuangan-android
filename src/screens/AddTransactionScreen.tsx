@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -86,7 +86,7 @@ export const AddTransactionScreen: React.FC = () => {
     }, [])
   );
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setFormData({
       amount: "",
       categoryId: "",
@@ -94,23 +94,26 @@ export const AddTransactionScreen: React.FC = () => {
     });
     setIsGlobalIncome(false);
     setTransactionType("income");
-  };
+  }, []);
 
-  const openModal = (type: "income" | "expense") => {
-    resetForm();
-    setTransactionType(type);
-    if (type === "income") {
-      setIsGlobalIncome(true); // Default ke global income
-    }
-    setModalVisible(true);
-  };
+  const openModal = useCallback(
+    (type: "income" | "expense") => {
+      resetForm();
+      setTransactionType(type);
+      if (type === "income") {
+        setIsGlobalIncome(true); // Default ke global income
+      }
+      setModalVisible(true);
+    },
+    [resetForm]
+  );
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModalVisible(false);
     resetForm();
-  };
+  }, [resetForm]);
 
-  const validateForm = (): boolean => {
+  const validateForm = useCallback((): boolean => {
     const amount = parseNumberInput(formData.amount);
 
     if (amount <= 0) {
@@ -142,9 +145,15 @@ export const AddTransactionScreen: React.FC = () => {
     }
 
     return true;
-  };
+  }, [
+    formData.amount,
+    isGlobalIncome,
+    formData.categoryId,
+    transactionType,
+    categories,
+  ]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!validateForm()) return;
 
     try {
@@ -174,10 +183,18 @@ export const AddTransactionScreen: React.FC = () => {
       Alert.alert("Error", "Gagal menambahkan transaksi");
       console.error("Error saving transaction:", error);
     }
-  };
+  }, [
+    validateForm,
+    formData,
+    transactionType,
+    isGlobalIncome,
+    addGlobalIncome,
+    addTransaction,
+    closeModal,
+  ]);
 
-  // Filter transaksi berdasarkan bulan
-  const getFilteredTransactions = (): Transaction[] => {
+  // Filter transaksi berdasarkan bulan dengan memoization
+  const filteredTransactions = useMemo((): Transaction[] => {
     if (filter === "all") return transactions;
 
     const now = new Date();
@@ -201,11 +218,11 @@ export const AddTransactionScreen: React.FC = () => {
 
       return false;
     });
-  };
+  }, [transactions, filter]);
 
-  // Group transaksi berdasarkan tanggal untuk tampilan yang lebih terorganisir
-  const groupTransactionsByDate = (transactions: Transaction[]) => {
-    const grouped = transactions.reduce((acc, transaction) => {
+  // Group transaksi berdasarkan tanggal dengan memoization
+  const groupedTransactions = useMemo(() => {
+    const grouped = filteredTransactions.reduce((acc, transaction) => {
       const dateKey = formatDate(transaction.date);
       if (!acc[dateKey]) {
         acc[dateKey] = [];
@@ -228,17 +245,19 @@ export const AddTransactionScreen: React.FC = () => {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       }),
     }));
-  };
+  }, [filteredTransactions]);
 
-  // Statistik transaksi yang difilter
-  const filteredTransactions = getFilteredTransactions();
-  const groupedTransactions = groupTransactionsByDate(filteredTransactions);
-  const totalIncome = filteredTransactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
-  const totalExpense = filteredTransactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
+  // Statistik transaksi dengan memoization
+  const { totalIncome, totalExpense } = useMemo(() => {
+    const income = filteredTransactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => sum + t.amount, 0);
+    const expense = filteredTransactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    return { totalIncome: income, totalExpense: expense };
+  }, [filteredTransactions]);
 
   const { month, year } = getCurrentMonthYear();
   const currentMonthName = getMonthName(month);

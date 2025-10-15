@@ -1,4 +1,10 @@
-import React, { createContext, ReactNode, useContext, useState } from "react";
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useState,
+} from "react";
 import {
   Category,
   database,
@@ -100,7 +106,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   });
 
   // Initialize database dan load data awal
-  const initializeApp = async (): Promise<void> => {
+  const initializeApp = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
       await database.initializeDatabase();
@@ -119,7 +125,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Categories methods
   const loadCategories = async (): Promise<void> => {
@@ -423,7 +429,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const handleInitializeNotifications = async (): Promise<void> => {
     try {
       await initializeNotifications();
-      console.log("Notifications initialized successfully");
+      // Notifications initialized successfully
     } catch (error) {
       console.error("Error initializing notifications:", error);
     }

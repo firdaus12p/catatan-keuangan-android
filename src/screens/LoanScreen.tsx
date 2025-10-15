@@ -23,7 +23,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
-import { Loan, LoanPayment } from "../db/database";
+import { Category, Loan, LoanPayment } from "../db/database";
 import { formatDate, getTodayString } from "../utils/dateHelper";
 import {
   formatCurrency,
@@ -33,7 +33,7 @@ import {
 
 interface LoanItemProps {
   loan: Loan;
-  categories: any[];
+  categories: Category[];
   onUpdateStatus: (
     id: number,
     status: "unpaid" | "half" | "paid",
@@ -301,7 +301,7 @@ export const LoanScreen: React.FC = () => {
 
       // Cleanup function saat screen blur/unfocus
       return () => {
-        console.log("LoanScreen blur - closing all menus");
+        // LoanScreen blur - closing all menus for better UX
       };
     }, [])
   );

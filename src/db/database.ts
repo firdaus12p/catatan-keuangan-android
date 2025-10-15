@@ -104,7 +104,7 @@ class Database {
       // Insert kategori default jika belum ada
       await this.insertDefaultCategories();
 
-      console.log("Database initialized successfully");
+      // Database initialized successfully - ready for production
     } catch (error) {
       console.error("Error initializing database:", error);
       throw error;
@@ -119,7 +119,7 @@ class Database {
       const existingCategories = await this.db.getAllAsync(
         "SELECT COUNT(*) as count FROM categories"
       );
-      const count = (existingCategories[0] as any).count;
+      const count = (existingCategories[0] as { count: number }).count;
 
       if (count === 0) {
         const defaultCategories = [
@@ -137,7 +137,7 @@ class Database {
             [category.name, category.percentage, 0]
           );
         }
-        console.log("Default categories inserted");
+        // Default categories inserted successfully
       }
     } catch (error) {
       console.error("Error inserting default categories:", error);
@@ -431,12 +431,12 @@ class Database {
       const incomeResult = (await this.db.getFirstAsync(
         'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = "income" AND date BETWEEN ? AND ?',
         [startDate, endDate]
-      )) as any;
+      )) as { total: number };
 
       const expenseResult = (await this.db.getFirstAsync(
         'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = "expense" AND date BETWEEN ? AND ?',
         [startDate, endDate]
-      )) as any;
+      )) as { total: number };
 
       return {
         totalIncome: incomeResult.total,
@@ -536,9 +536,9 @@ class Database {
     try {
       // Hapus semua transaksi yang berkaitan dengan pinjaman
       await this.db.runAsync(
-        "DELETE FROM transactions WHERE note LIKE '%pinjaman%' OR note LIKE '%Pinjaman%'"
+        "DELETE FROM transactions WHERE note LIKE '%pembayaran pinjaman%' OR note LIKE '%loan payment%'"
       );
-      console.log("Loan-related transactions cleaned up");
+      // Loan-related transactions cleaned up successfully
     } catch (error) {
       console.error("Error cleaning up loan transactions:", error);
       throw error;

@@ -70,6 +70,15 @@ export default function TabLayout() {
             ),
           }}
         />
+        <Tabs.Screen
+          name="notification"
+          options={{
+            title: "Notifikasi",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="notifications" size={size} color={color} />
+            ),
+          }}
+        />
       </Tabs>
       <FloatingActionButtons />
     </>

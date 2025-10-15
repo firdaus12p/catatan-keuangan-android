@@ -6,6 +6,7 @@ import {
   LoanPayment,
   Transaction,
 } from "../db/database";
+import { initializeNotifications } from "../utils/notificationHelper";
 
 // Interface untuk Context
 interface AppContextType {
@@ -35,6 +36,9 @@ interface AppContextType {
 
   // Loan Payments
   getLoanPayments: (loanId: number) => Promise<LoanPayment[]>;
+
+  // Notifications
+  initializeNotifications: () => Promise<void>;
 
   // Statistics
   monthlyStats: { totalIncome: number; totalExpense: number };
@@ -85,6 +89,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       // Load statistik bulan ini
       const now = new Date();
       await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+
+      // Initialize notifications
+      await handleInitializeNotifications();
     } catch (error) {
       console.error("Error initializing app:", error);
     } finally {
@@ -335,6 +342,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
+  // Initialize notifications saat app pertama kali dibuka
+  const handleInitializeNotifications = async (): Promise<void> => {
+    try {
+      await initializeNotifications();
+      console.log("Notifications initialized successfully");
+    } catch (error) {
+      console.error("Error initializing notifications:", error);
+    }
+  };
+
   const value: AppContextType = {
     // Categories
     categories,
@@ -358,6 +375,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
     // Loan Payments
     getLoanPayments,
+
+    // Notifications
+    initializeNotifications: handleInitializeNotifications,
 
     // Statistics
     monthlyStats,

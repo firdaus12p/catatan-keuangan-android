@@ -27,6 +27,7 @@ import { TransactionItem } from "../components/TransactionItem";
 import { useApp } from "../context/AppContext";
 import { Transaction } from "../db/database";
 import {
+  formatDate,
   getCurrentMonthYear,
   getMonthName,
   getTodayString,
@@ -202,8 +203,36 @@ export const AddTransactionScreen: React.FC = () => {
     });
   };
 
+  // Group transaksi berdasarkan tanggal untuk tampilan yang lebih terorganisir
+  const groupTransactionsByDate = (transactions: Transaction[]) => {
+    const grouped = transactions.reduce((acc, transaction) => {
+      const dateKey = formatDate(transaction.date);
+      if (!acc[dateKey]) {
+        acc[dateKey] = [];
+      }
+      acc[dateKey].push(transaction);
+      return acc;
+    }, {} as Record<string, Transaction[]>);
+
+    // Urutkan berdasarkan tanggal terbaru
+    const sortedKeys = Object.keys(grouped).sort((a, b) => {
+      const dateA = new Date(grouped[a][0].date);
+      const dateB = new Date(grouped[b][0].date);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    return sortedKeys.map((dateKey) => ({
+      date: dateKey,
+      transactions: grouped[dateKey].sort((a, b) => {
+        // Urutkan transaksi dalam hari yang sama berdasarkan waktu
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      }),
+    }));
+  };
+
   // Statistik transaksi yang difilter
   const filteredTransactions = getFilteredTransactions();
+  const groupedTransactions = groupTransactionsByDate(filteredTransactions);
   const totalIncome = filteredTransactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
@@ -280,11 +309,49 @@ export const AddTransactionScreen: React.FC = () => {
           </View>
         </Card.Content>
       </Card>
+
+      {/* Header Riwayat Transaksi */}
+      <View style={styles.historyHeader}>
+        <View style={styles.historyTitleContainer}>
+          <MaterialIcons name="history" size={24} color="#2196F3" />
+          <Text style={styles.historyTitle}>Riwayat Transaksi</Text>
+        </View>
+        <Text style={styles.historySubtitle}>
+          {filter === "current" && `${currentMonthName} ${year}`}
+          {filter === "previous" &&
+            `${previousMonthName} ${month === 1 ? year - 1 : year}`}
+          {filter === "all" && "Semua Periode"}
+        </Text>
+        {filteredTransactions.length > 0 && (
+          <Text style={styles.transactionCount}>
+            {filteredTransactions.length} transaksi ditemukan
+          </Text>
+        )}
+      </View>
     </View>
   );
 
-  const renderTransactionItem = ({ item }: { item: Transaction }) => (
-    <TransactionItem transaction={item} categories={categories} />
+  const renderTransactionGroup = ({
+    item,
+  }: {
+    item: { date: string; transactions: Transaction[] };
+  }) => (
+    <View style={styles.transactionGroup}>
+      <View style={styles.dateHeader}>
+        <MaterialIcons name="calendar-today" size={16} color="#2196F3" />
+        <Text style={styles.dateHeaderText}>{item.date}</Text>
+        <Text style={styles.transactionCountInGroup}>
+          {item.transactions.length} transaksi
+        </Text>
+      </View>
+      {item.transactions.map((transaction) => (
+        <TransactionItem
+          key={transaction.id!.toString()}
+          transaction={transaction}
+          categories={categories}
+        />
+      ))}
+    </View>
   );
 
   return (
@@ -294,9 +361,9 @@ export const AddTransactionScreen: React.FC = () => {
       </Appbar.Header>
 
       <FlatList
-        data={filteredTransactions}
-        renderItem={renderTransactionItem}
-        keyExtractor={(item) => item.id!.toString()}
+        data={groupedTransactions}
+        renderItem={renderTransactionGroup}
+        keyExtractor={(item) => item.date}
         ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
@@ -596,5 +663,69 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     marginHorizontal: 8,
+  },
+  historyHeader: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  historyTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  historyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333333",
+    marginLeft: 8,
+  },
+  historySubtitle: {
+    fontSize: 14,
+    color: "#666666",
+    marginBottom: 4,
+  },
+  transactionCount: {
+    fontSize: 12,
+    color: "#999999",
+    fontStyle: "italic",
+  },
+  transactionGroup: {
+    marginBottom: 16,
+  },
+  dateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F9FA",
+    marginHorizontal: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: "#2196F3",
+  },
+  dateHeaderText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333333",
+    marginLeft: 8,
+    flex: 1,
+  },
+  transactionCountInGroup: {
+    fontSize: 12,
+    color: "#666666",
+    backgroundColor: "#E3F2FD",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
 });

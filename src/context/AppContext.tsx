@@ -1,5 +1,11 @@
 import React, { createContext, ReactNode, useContext, useState } from "react";
-import { Category, database, Loan, Transaction } from "../db/database";
+import {
+  Category,
+  database,
+  Loan,
+  LoanPayment,
+  Transaction,
+} from "../db/database";
 
 // Interface untuk Context
 interface AppContextType {
@@ -26,6 +32,9 @@ interface AppContextType {
     repaymentAmount?: number
   ) => Promise<void>;
   deleteLoan: (id: number) => Promise<void>;
+
+  // Loan Payments
+  getLoanPayments: (loanId: number) => Promise<LoanPayment[]>;
 
   // Statistics
   monthlyStats: { totalIncome: number; totalExpense: number };
@@ -228,6 +237,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
+  // Loan Payments methods
+  const getLoanPayments = async (loanId: number): Promise<LoanPayment[]> => {
+    try {
+      return await database.getLoanPayments(loanId);
+    } catch (error) {
+      console.error("Error getting loan payments:", error);
+      throw error;
+    }
+  };
+
   // Statistics methods
   const loadMonthlyStats = async (
     year: number,
@@ -336,6 +355,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     addLoan,
     updateLoanStatus,
     deleteLoan,
+
+    // Loan Payments
+    getLoanPayments,
 
     // Statistics
     monthlyStats,

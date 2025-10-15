@@ -28,6 +28,15 @@ export interface Loan {
   date: string;
 }
 
+// Interface untuk tabel loan_payments (tracking pembayaran)
+export interface LoanPayment {
+  id?: number;
+  loan_id: number;
+  amount: number;
+  payment_date: string;
+  remaining_amount: number;
+}
+
 class Database {
   private db: SQLite.SQLiteDatabase | null = null;
 
@@ -68,6 +77,18 @@ class Database {
           status TEXT NOT NULL CHECK (status IN ('unpaid', 'half', 'paid')),
           date TEXT NOT NULL,
           FOREIGN KEY (category_id) REFERENCES categories (id)
+        );
+      `);
+
+      // Buat tabel loan_payments untuk tracking pembayaran
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS loan_payments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          loan_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          payment_date TEXT NOT NULL,
+          remaining_amount REAL NOT NULL,
+          FOREIGN KEY (loan_id) REFERENCES loans (id)
         );
       `);
 
@@ -347,13 +368,29 @@ class Database {
           [loan.amount, loan.category_id]
         );
 
+        // Catat sebagai transaksi income untuk menambah saldo bersih
+        await this.db.runAsync(
+          "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
+          [
+            "income",
+            loan.amount,
+            loan.category_id,
+            `Pelunasan pinjaman dari: ${loan.name}`,
+            new Date().toISOString(),
+          ]
+        );
+
+        // Catat pembayaran ke history
+        await this.db.runAsync(
+          "INSERT INTO loan_payments (loan_id, amount, payment_date, remaining_amount) VALUES (?, ?, ?, ?)",
+          [id, loan.amount, new Date().toISOString(), 0]
+        );
+
         // Update status dan amount pinjaman menjadi 0
         await this.db.runAsync(
           "UPDATE loans SET status = ?, amount = 0 WHERE id = ?",
           [finalStatus, id]
         );
-
-        // TIDAK mencatat sebagai transaksi income/expense karena ini hanya pengembalian saldo internal
       } else if (finalStatus === "half" && finalRepaymentAmount > 0) {
         // Bayar sebagian - kembalikan sebagian uang dan kurangi jumlah pinjaman
         await this.db.runAsync(
@@ -361,14 +398,32 @@ class Database {
           [finalRepaymentAmount, loan.category_id]
         );
 
+        // Catat sebagai transaksi income untuk menambah saldo bersih
+        await this.db.runAsync(
+          "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
+          [
+            "income",
+            finalRepaymentAmount,
+            loan.category_id,
+            `Pembayaran sebagian pinjaman dari: ${loan.name}`,
+            new Date().toISOString(),
+          ]
+        );
+
         // Update amount pinjaman (kurangi dengan jumlah yang dibayar)
         const newLoanAmount = loan.amount - finalRepaymentAmount;
+
+        // Catat pembayaran ke history
+        await this.db.runAsync(
+          "INSERT INTO loan_payments (loan_id, amount, payment_date, remaining_amount) VALUES (?, ?, ?, ?)",
+          [id, finalRepaymentAmount, new Date().toISOString(), newLoanAmount]
+        );
+
+        // Update status dan amount pinjaman
         await this.db.runAsync(
           "UPDATE loans SET status = ?, amount = ? WHERE id = ?",
           [finalStatus, newLoanAmount, id]
         );
-
-        // TIDAK mencatat sebagai transaksi income/expense karena ini hanya pengembalian saldo internal
       } else {
         // Hanya update status tanpa perubahan lain
         await this.db.runAsync("UPDATE loans SET status = ? WHERE id = ?", [
@@ -422,11 +477,38 @@ class Database {
     }
   }
 
+  // Loan Payment History methods
+  async getLoanPayments(loanId: number): Promise<LoanPayment[]> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      return await this.db.getAllAsync(
+        "SELECT * FROM loan_payments WHERE loan_id = ? ORDER BY payment_date DESC",
+        [loanId]
+      );
+    } catch (error) {
+      console.error("Error getting loan payments:", error);
+      throw error;
+    }
+  }
+
+  async getAllLoanPayments(): Promise<LoanPayment[]> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      return await this.db.getAllAsync(
+        "SELECT * FROM loan_payments ORDER BY payment_date DESC"
+      );
+    } catch (error) {
+      console.error("Error getting all loan payments:", error);
+      throw error;
+    }
+  }
+
   // Reset functions untuk membersihkan data
   async resetAllData(): Promise<void> {
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.execAsync("DELETE FROM transactions");
+      await this.db.execAsync("DELETE FROM loan_payments");
       await this.db.execAsync("DELETE FROM loans");
       await this.db.execAsync("UPDATE categories SET balance = 0");
     } catch (error) {
@@ -449,6 +531,7 @@ class Database {
   async resetLoans(): Promise<void> {
     if (!this.db) throw new Error("Database not initialized");
     try {
+      await this.db.execAsync("DELETE FROM loan_payments");
       await this.db.execAsync("DELETE FROM loans");
     } catch (error) {
       console.error("Error resetting loans:", error);

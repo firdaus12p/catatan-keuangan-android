@@ -23,7 +23,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
-import { Loan } from "../db/database";
+import { Loan, LoanPayment } from "../db/database";
 import { formatDate, getTodayString } from "../utils/dateHelper";
 import {
   formatCurrency,
@@ -40,6 +40,7 @@ interface LoanItemProps {
     repaymentAmount?: number
   ) => void;
   onDelete: (id: number) => void;
+  onViewPayments: (loanId: number, loanName: string) => void;
 }
 
 const LoanItem: React.FC<LoanItemProps> = ({
@@ -47,6 +48,7 @@ const LoanItem: React.FC<LoanItemProps> = ({
   categories,
   onUpdateStatus,
   onDelete,
+  onViewPayments,
 }) => {
   const [repaymentModalVisible, setRepaymentModalVisible] = useState(false);
   const [repaymentAmount, setRepaymentAmount] = useState("");
@@ -157,6 +159,15 @@ const LoanItem: React.FC<LoanItemProps> = ({
 
               {/* Action Buttons */}
               <View style={styles.actionButtons}>
+                {(loan.status === "half" || loan.status === "paid") && (
+                  <IconButton
+                    icon="history"
+                    iconColor="#2196F3"
+                    size={20}
+                    onPress={() => onViewPayments(loan.id!, loan.name)}
+                    style={styles.actionButton}
+                  />
+                )}
                 {loan.status !== "paid" && (
                   <>
                     <IconButton
@@ -254,12 +265,16 @@ export const LoanScreen: React.FC = () => {
     addLoan,
     updateLoanStatus,
     deleteLoan,
+    getLoanPayments,
   } = useApp();
 
   const { action } = useLocalSearchParams<{ action?: string }>();
   const router = useRouter();
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [paymentHistoryVisible, setPaymentHistoryVisible] = useState(false);
+  const [selectedLoanName, setSelectedLoanName] = useState("");
+  const [paymentHistory, setPaymentHistory] = useState<LoanPayment[]>([]);
   const [filterStatus, setFilterStatus] = useState<
     "all" | "unpaid" | "half" | "paid"
   >("all");
@@ -401,6 +416,21 @@ export const LoanScreen: React.FC = () => {
     [deleteLoan]
   );
 
+  const handleViewPayments = useCallback(
+    async (loanId: number, loanName: string) => {
+      try {
+        const payments = await getLoanPayments(loanId);
+        setPaymentHistory(payments);
+        setSelectedLoanName(loanName);
+        setPaymentHistoryVisible(true);
+      } catch (error) {
+        Alert.alert("Error", "Gagal memuat history pembayaran");
+        console.error("Error loading payment history:", error);
+      }
+    },
+    [getLoanPayments]
+  );
+
   // Filter loans berdasarkan status
   const filteredLoans =
     filterStatus === "all"
@@ -490,9 +520,10 @@ export const LoanScreen: React.FC = () => {
         categories={categories}
         onUpdateStatus={handleUpdateStatus}
         onDelete={handleDelete}
+        onViewPayments={handleViewPayments}
       />
     ),
-    [categories, handleUpdateStatus, handleDelete]
+    [categories, handleUpdateStatus, handleDelete, handleViewPayments]
   );
 
   return (
@@ -591,6 +622,66 @@ export const LoanScreen: React.FC = () => {
               </Button>
             </View>
           </ScrollView>
+        </Modal>
+      </Portal>
+
+      {/* Modal untuk payment history */}
+      <Portal>
+        <Modal
+          visible={paymentHistoryVisible}
+          onDismiss={() => setPaymentHistoryVisible(false)}
+          contentContainerStyle={styles.paymentHistoryModal}
+        >
+          <Text style={styles.modalTitle}>History Pembayaran</Text>
+          <Text style={styles.modalSubtitle}>Pinjaman: {selectedLoanName}</Text>
+
+          <ScrollView
+            style={styles.paymentList}
+            showsVerticalScrollIndicator={false}
+          >
+            {paymentHistory.length === 0 ? (
+              <View style={styles.emptyPaymentHistory}>
+                <MaterialIcons name="payment" size={48} color="#CCCCCC" />
+                <Text style={styles.emptyPaymentText}>
+                  Belum ada history pembayaran
+                </Text>
+              </View>
+            ) : (
+              paymentHistory.map((payment, index) => (
+                <Card key={payment.id || index} style={styles.paymentCard}>
+                  <Card.Content>
+                    <View style={styles.paymentHeader}>
+                      <View style={styles.paymentInfo}>
+                        <Text style={styles.paymentDate}>
+                          {formatDate(payment.payment_date)}
+                        </Text>
+                        <Text style={styles.paymentAmount}>
+                          {formatCurrency(payment.amount)}
+                        </Text>
+                      </View>
+                      <Chip
+                        icon="check-circle"
+                        style={styles.paymentStatusChip}
+                        textStyle={{ color: "#4CAF50" }}
+                      >
+                        Dibayar
+                      </Chip>
+                    </View>
+                  </Card.Content>
+                </Card>
+              ))
+            )}
+          </ScrollView>
+
+          <View style={styles.modalActions}>
+            <Button
+              mode="contained"
+              onPress={() => setPaymentHistoryVisible(false)}
+              style={styles.fullButton}
+            >
+              Tutup
+            </Button>
+          </View>
         </Modal>
       </Portal>
     </SafeAreaView>
@@ -799,5 +890,56 @@ const styles = StyleSheet.create({
   actionButton: {
     margin: 0,
     marginLeft: 4,
+  },
+  paymentHistoryModal: {
+    backgroundColor: "#FFFFFF",
+    padding: 24,
+    margin: 20,
+    borderRadius: 12,
+    maxHeight: "80%",
+  },
+  paymentList: {
+    maxHeight: 400,
+    marginVertical: 16,
+  },
+  emptyPaymentHistory: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+  },
+  emptyPaymentText: {
+    fontSize: 16,
+    color: "#999999",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  paymentCard: {
+    marginVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "#F8F9FA",
+  },
+  paymentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  paymentInfo: {
+    flex: 1,
+  },
+  paymentDate: {
+    fontSize: 14,
+    color: "#666666",
+    marginBottom: 4,
+  },
+  paymentAmount: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333333",
+  },
+  paymentStatusChip: {
+    backgroundColor: "#4CAF5020",
+  },
+  fullButton: {
+    width: "100%",
   },
 });

@@ -360,17 +360,6 @@ export const NotificationScreen: React.FC = () => {
               <Text style={styles.infoItem}>
                 • Pastikan izin notifikasi diaktifkan di pengaturan sistem
               </Text>
-              {__DEV__ && (
-                <Text
-                  style={[
-                    styles.infoItem,
-                    { color: "#FF9800", fontWeight: "500" },
-                  ]}
-                >
-                  • Untuk fitur lengkap, gunakan development build (bukan Expo
-                  Go)
-                </Text>
-              )}
             </View>
           </Card.Content>
         </Card>

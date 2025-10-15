@@ -309,22 +309,13 @@ class Database {
       );
 
       // Kurangi saldo kategori saat membuat pinjaman
+      // Ini BUKAN transaksi expense, hanya perpindahan uang yang sudah ada
       await this.db.runAsync(
         "UPDATE categories SET balance = balance - ? WHERE id = ?",
         [loan.amount, loan.category_id]
       );
 
-      // Catat sebagai transaksi pengeluaran di riwayat
-      await this.db.runAsync(
-        "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
-        [
-          "expense",
-          loan.amount,
-          loan.category_id,
-          `Pinjaman kepada: ${loan.name}`,
-          loan.date,
-        ]
-      );
+      // TIDAK dicatat sebagai transaksi - pinjaman hanya history tersendiri
 
       return result.lastInsertRowId;
     } catch (error) {
@@ -362,25 +353,15 @@ class Database {
 
       // Kembalikan uang ke kategori sesuai status
       if (finalStatus === "paid") {
-        // Lunas - kembalikan sisa jumlah pinjaman
+        // Lunas - kembalikan sisa jumlah pinjaman ke saldo kategori
         await this.db.runAsync(
           "UPDATE categories SET balance = balance + ? WHERE id = ?",
           [loan.amount, loan.category_id]
         );
 
-        // Catat sebagai transaksi income untuk menambah saldo bersih
-        await this.db.runAsync(
-          "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
-          [
-            "income",
-            loan.amount,
-            loan.category_id,
-            `Pelunasan pinjaman dari: ${loan.name}`,
-            new Date().toISOString(),
-          ]
-        );
+        // TIDAK dicatat sebagai income transaction - ini hanya pengembalian uang yang sudah ada
 
-        // Catat pembayaran ke history
+        // Catat pembayaran ke history loan payments
         await this.db.runAsync(
           "INSERT INTO loan_payments (loan_id, amount, payment_date, remaining_amount) VALUES (?, ?, ?, ?)",
           [id, loan.amount, new Date().toISOString(), 0]
@@ -392,28 +373,18 @@ class Database {
           [finalStatus, id]
         );
       } else if (finalStatus === "half" && finalRepaymentAmount > 0) {
-        // Bayar sebagian - kembalikan sebagian uang dan kurangi jumlah pinjaman
+        // Bayar sebagian - kembalikan sebagian uang ke saldo kategori
         await this.db.runAsync(
           "UPDATE categories SET balance = balance + ? WHERE id = ?",
           [finalRepaymentAmount, loan.category_id]
         );
 
-        // Catat sebagai transaksi income untuk menambah saldo bersih
-        await this.db.runAsync(
-          "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
-          [
-            "income",
-            finalRepaymentAmount,
-            loan.category_id,
-            `Pembayaran sebagian pinjaman dari: ${loan.name}`,
-            new Date().toISOString(),
-          ]
-        );
+        // TIDAK dicatat sebagai income transaction - ini hanya pengembalian sebagian uang yang sudah ada
 
         // Update amount pinjaman (kurangi dengan jumlah yang dibayar)
         const newLoanAmount = loan.amount - finalRepaymentAmount;
 
-        // Catat pembayaran ke history
+        // Catat pembayaran ke history loan payments
         await this.db.runAsync(
           "INSERT INTO loan_payments (loan_id, amount, payment_date, remaining_amount) VALUES (?, ?, ?, ?)",
           [id, finalRepaymentAmount, new Date().toISOString(), newLoanAmount]
@@ -555,6 +526,21 @@ class Database {
       await this.db.execAsync("UPDATE categories SET balance = 0");
     } catch (error) {
       console.error("Error resetting category balances:", error);
+      throw error;
+    }
+  }
+
+  // Membersihkan transaksi pinjaman yang tidak seharusnya ada
+  async cleanupLoanTransactions(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      // Hapus semua transaksi yang berkaitan dengan pinjaman
+      await this.db.runAsync(
+        "DELETE FROM transactions WHERE note LIKE '%pinjaman%' OR note LIKE '%Pinjaman%'"
+      );
+      console.log("Loan-related transactions cleaned up");
+    } catch (error) {
+      console.error("Error cleaning up loan transactions:", error);
       throw error;
     }
   }

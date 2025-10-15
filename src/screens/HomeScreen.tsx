@@ -86,7 +86,8 @@ export const HomeScreen: React.FC = () => {
 
   // Hitung total saldo dari semua kategori
   const totalBalance = categories.reduce((sum, cat) => sum + cat.balance, 0);
-  const netBalance = monthlyStats.totalIncome - monthlyStats.totalExpense;
+  // Gunakan saldo bersih dari monthlyStats yang sudah dihitung dengan benar
+  const saldoBersih = monthlyStats.saldoBersih;
 
   // Data untuk Income vs Expense Chart
   const incomeExpenseData = {
@@ -220,8 +221,10 @@ export const HomeScreen: React.FC = () => {
               size={24}
               color="#2196F3"
             />
-            <Text style={styles.statLabel}>Saldo Keseluruhan</Text>
-            <Text style={styles.statValue}>{formatCurrency(totalBalance)}</Text>
+            <Text style={styles.statLabel}>Total Saldo</Text>
+            <Text style={styles.statValue}>
+              {formatCurrency(monthlyStats.totalSaldo)}
+            </Text>
           </View>
 
           <View style={styles.statItem}>
@@ -242,18 +245,18 @@ export const HomeScreen: React.FC = () => {
 
           <View style={styles.statItem}>
             <MaterialIcons
-              name={netBalance >= 0 ? "savings" : "warning"}
+              name={saldoBersih >= 0 ? "savings" : "warning"}
               size={24}
-              color={netBalance >= 0 ? "#4CAF50" : "#F44336"}
+              color={saldoBersih >= 0 ? "#4CAF50" : "#F44336"}
             />
             <Text style={styles.statLabel}>Saldo Bersih</Text>
             <Text
               style={[
                 styles.statValue,
-                { color: netBalance >= 0 ? "#4CAF50" : "#F44336" },
+                { color: saldoBersih >= 0 ? "#4CAF50" : "#F44336" },
               ]}
             >
-              {formatCurrency(netBalance)}
+              {formatCurrency(saldoBersih)}
             </Text>
           </View>
         </View>

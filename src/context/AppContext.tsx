@@ -41,8 +41,16 @@ interface AppContextType {
   initializeNotifications: () => Promise<void>;
 
   // Statistics
-  monthlyStats: { totalIncome: number; totalExpense: number };
+  monthlyStats: {
+    totalIncome: number;
+    totalExpense: number;
+    totalSaldo: number; // Total pemasukan yang tercatat bulan ini
+    saldoBersih: number; // Saldo yang tersedia saat ini (dipengaruhi pinjaman)
+    totalOutstandingLoans: number; // Total pinjaman yang belum lunas
+  };
+  totalAllTimeBalance: number; // Total pemasukan kumulatif semua bulan
   loadMonthlyStats: (year: number, month: number) => Promise<void>;
+  loadTotalAllTimeBalance: () => Promise<void>;
 
   // Reset functions
   resetAllData: () => Promise<void>;
@@ -50,6 +58,7 @@ interface AppContextType {
   resetLoans: () => Promise<void>;
   resetCategories: () => Promise<void>;
   resetCategoryBalances: () => Promise<void>;
+  cleanupLoanTransactions: () => Promise<void>;
 
   // Loading states
   loading: boolean;
@@ -74,8 +83,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [monthlyStats, setMonthlyStats] = useState({
     totalIncome: 0,
     totalExpense: 0,
+    totalSaldo: 0, // Total pemasukan yang tercatat bulan ini
+    saldoBersih: 0, // Saldo yang tersedia saat ini (dipengaruhi pinjaman)
+    totalOutstandingLoans: 0, // Total pinjaman yang belum lunas
   });
+  const [totalAllTimeBalance, setTotalAllTimeBalance] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  // Helper function untuk membuat empty stats
+  const createEmptyStats = () => ({
+    totalIncome: 0,
+    totalExpense: 0,
+    totalSaldo: 0,
+    saldoBersih: 0,
+    totalOutstandingLoans: 0,
+  });
 
   // Initialize database dan load data awal
   const initializeApp = async (): Promise<void> => {
@@ -261,9 +283,47 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   ): Promise<void> => {
     try {
       const stats = await database.getMonthlyStats(year, month);
-      setMonthlyStats(stats);
+      // Total Saldo = hanya total pemasukan yang tercatat (bukan income - expense)
+      const totalSaldo = stats.totalIncome;
+
+      // Calculate total outstanding loans
+      const currentLoans = await database.getAllLoans();
+      const totalOutstandingLoans = currentLoans
+        .filter((loan) => loan.status !== "paid")
+        .reduce((sum, loan) => sum + loan.amount, 0);
+
+      // Saldo Bersih = saldo yang tersedia saat ini
+      // Dihitung dari total semua kategori balance (yang sudah terpengaruh operasi pinjaman)
+      const categories = await database.getAllCategories();
+      const totalCategoryBalance = categories.reduce(
+        (sum: number, cat: Category) => sum + cat.balance,
+        0
+      );
+      const saldoBersih = totalCategoryBalance;
+
+      setMonthlyStats({
+        ...stats,
+        totalSaldo,
+        saldoBersih,
+        totalOutstandingLoans,
+      });
     } catch (error) {
       console.error("Error loading monthly stats:", error);
+    }
+  };
+
+  const loadTotalAllTimeBalance = async (): Promise<void> => {
+    try {
+      // Total All-Time Balance = hanya total pemasukan semua bulan
+      // Bukan pemasukan - pengeluaran, sesuai dengan konsep Total Saldo
+      const allTransactions = await database.getTransactions(999999, 0);
+      const totalAllTimeIncome = allTransactions
+        .filter((t: Transaction) => t.type === "income")
+        .reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+
+      setTotalAllTimeBalance(totalAllTimeIncome);
+    } catch (error) {
+      console.error("Error loading total all-time balance:", error);
     }
   };
 
@@ -275,7 +335,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await loadCategories();
       await loadTransactions();
       await loadLoans();
-      setMonthlyStats({ totalIncome: 0, totalExpense: 0 });
+      setMonthlyStats(createEmptyStats());
     } catch (error) {
       console.error("Error resetting all data:", error);
       throw error;
@@ -290,7 +350,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await database.resetTransactions();
       await loadCategories();
       await loadTransactions();
-      setMonthlyStats({ totalIncome: 0, totalExpense: 0 });
+      setMonthlyStats(createEmptyStats());
     } catch (error) {
       console.error("Error resetting transactions:", error);
       throw error;
@@ -319,7 +379,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await loadCategories();
       await loadTransactions();
       await loadLoans();
-      setMonthlyStats({ totalIncome: 0, totalExpense: 0 });
+      setMonthlyStats(createEmptyStats());
     } catch (error) {
       console.error("Error resetting categories:", error);
       throw error;
@@ -333,9 +393,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       setLoading(true);
       await database.resetCategoryBalances();
       await loadCategories();
-      setMonthlyStats({ totalIncome: 0, totalExpense: 0 });
+      setMonthlyStats(createEmptyStats());
     } catch (error) {
       console.error("Error resetting category balances:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cleanupLoanTransactions = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      await database.cleanupLoanTransactions();
+      await loadTransactions();
+      await loadCategories();
+      // Reload monthly stats karena transactions berubah
+      const now = new Date();
+      await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+    } catch (error) {
+      console.error("Error cleaning up loan transactions:", error);
       throw error;
     } finally {
       setLoading(false);
@@ -381,7 +458,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
     // Statistics
     monthlyStats,
+    totalAllTimeBalance,
     loadMonthlyStats,
+    loadTotalAllTimeBalance,
 
     // Reset functions
     resetAllData,
@@ -389,6 +468,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     resetLoans,
     resetCategories,
     resetCategoryBalances,
+    cleanupLoanTransactions,
 
     // Loading state
     loading,

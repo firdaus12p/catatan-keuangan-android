@@ -8,14 +8,18 @@ export const commonStyles = StyleSheet.create({
   header: {
     backgroundColor: "#2196F3",
     elevation: 4,
-    height: 80,
-    minHeight: 80,
+    height: 20,
+    minHeight: 10,
   },
   headerTitle: {
     color: "#FFFFFF",
-    fontSize: 18,
-    marginTop: 20,
+    fontSize: 22,
+    marginTop: -25,
     fontWeight: "bold" as const,
+  },
+  headerSubtitle: {
+    color: "#E3F2FD",
+    fontSize: 14,
   },
   card: {
     margin: 16,
@@ -87,4 +91,5 @@ export const colors = {
   category: "#9C27B0", // Purple for category
   home: "#2196F3", // Blue for home
   notification: "#607D8B", // Blue grey for notification
+  analytics: "#673AB7", // Deep purple for analytics
 };

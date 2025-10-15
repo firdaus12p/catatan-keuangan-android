@@ -7,7 +7,7 @@ import { formatDate } from "../utils/dateHelper";
 import { formatCurrency } from "../utils/formatCurrency";
 
 interface TransactionItemProps {
-  transaction: Transaction;
+  transaction: Transaction & { expense_type_name?: string };
   categories: Category[];
 }
 
@@ -38,6 +38,11 @@ export const TransactionItem: React.FC<TransactionItemProps> = React.memo(
 
             <View style={styles.textContainer}>
               <Text style={styles.categoryText}>{categoryName}</Text>
+              {transaction.expense_type_name && (
+                <Text style={styles.expenseTypeText}>
+                  {transaction.expense_type_name}
+                </Text>
+              )}
               <Text style={styles.noteText} numberOfLines={2}>
                 {transaction.note || "Tidak ada catatan"}
               </Text>
@@ -100,6 +105,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666666",
     marginBottom: 2,
+  },
+  expenseTypeText: {
+    fontSize: 12,
+    color: "#9C27B0",
+    fontWeight: "500",
+    backgroundColor: "#F3E5F5",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: "flex-start",
+    marginBottom: 4,
   },
   dateText: {
     fontSize: 12,

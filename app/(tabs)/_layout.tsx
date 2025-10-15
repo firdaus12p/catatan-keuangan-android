@@ -94,14 +94,6 @@ export default function TabLayout() {
             tabBarIcon: createTabIcon("handshake", colors.loan),
           }}
         />
-        <Tabs.Screen
-          name="notification"
-          options={{
-            title: "Notifikasi",
-            tabBarActiveTintColor: colors.notification,
-            tabBarIcon: createTabIcon("notifications", colors.notification),
-          }}
-        />
       </Tabs>
       <FloatingActionButtons />
     </>

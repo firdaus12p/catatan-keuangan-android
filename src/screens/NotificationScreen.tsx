@@ -10,16 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  Appbar,
-  Button,
-  Card,
-  List,
-  Modal,
-  Portal,
-  Switch,
-} from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Button, Card, List, Modal, Portal, Switch } from "react-native-paper";
 import {
   NotificationSettings,
   cancelScheduledNotification,
@@ -257,29 +248,16 @@ export const NotificationScreen: React.FC = React.memo(() => {
 
   if (loading && !isInitialized) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Appbar.Header style={styles.header}>
-          <Appbar.Content
-            title="Pengaturan Notifikasi"
-            titleStyle={styles.headerTitle}
-          />
-        </Appbar.Header>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Memuat pengaturan...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Appbar.Header style={styles.header}>
-        <Appbar.Content
-          title="Pengaturan Notifikasi"
-          titleStyle={styles.headerTitle}
-        />
-      </Appbar.Header>
-
+    <View style={styles.container}>
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.scrollContainer}
@@ -446,7 +424,7 @@ export const NotificationScreen: React.FC = React.memo(() => {
           )}
         </Modal>
       </Portal>
-    </SafeAreaView>
+    </View>
   );
 });
 
@@ -454,18 +432,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F5F5F5",
-  },
-  header: {
-    backgroundColor: "#2196F3",
-    elevation: 4,
-    height: 20,
-    minHeight: 10,
-  },
-  headerTitle: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    marginTop: -25,
-    fontWeight: "bold",
   },
   content: {
     flex: 1,

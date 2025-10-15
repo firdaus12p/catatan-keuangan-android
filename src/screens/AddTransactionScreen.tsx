@@ -25,7 +25,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TransactionItem } from "../components/TransactionItem";
 import { useApp } from "../context/AppContext";
-import { Transaction } from "../db/database";
+import { ExpenseType, Transaction, database } from "../db/database";
 import {
   formatDate,
   getCurrentMonthYear,
@@ -62,8 +62,10 @@ export const AddTransactionScreen: React.FC = () => {
   const [formData, setFormData] = useState({
     amount: "",
     categoryId: "",
+    expenseTypeId: "",
     note: "",
   });
+  const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
   const [filter, setFilter] = useState<"all" | "current" | "previous">(
     "current"
   );
@@ -86,13 +88,24 @@ export const AddTransactionScreen: React.FC = () => {
     React.useCallback(() => {
       loadCategories();
       loadTransactions();
+      loadExpenseTypes();
     }, [])
   );
+
+  const loadExpenseTypes = async () => {
+    try {
+      const types = await database.getAllExpenseTypes();
+      setExpenseTypes(types);
+    } catch (error) {
+      console.error("Error loading expense types:", error);
+    }
+  };
 
   const resetForm = useCallback(() => {
     setFormData({
       amount: "",
       categoryId: "",
+      expenseTypeId: "",
       note: "",
     });
     setIsGlobalIncome(false);
@@ -131,6 +144,12 @@ export const AddTransactionScreen: React.FC = () => {
 
     // Validasi saldo untuk pengeluaran
     if (transactionType === "expense") {
+      // Validasi expense type harus dipilih untuk pengeluaran
+      if (!formData.expenseTypeId) {
+        Alert.alert("Error", "Pilih jenis pengeluaran terlebih dahulu");
+        return false;
+      }
+
       const selectedCategory = categories.find(
         (cat) => cat.id!.toString() === formData.categoryId
       );
@@ -171,6 +190,10 @@ export const AddTransactionScreen: React.FC = () => {
           type: transactionType,
           amount,
           category_id: parseInt(formData.categoryId),
+          expense_type_id:
+            transactionType === "expense" && formData.expenseTypeId
+              ? parseInt(formData.expenseTypeId)
+              : undefined,
           note:
             formData.note ||
             (transactionType === "income" ? "Pemasukan" : "Pengeluaran"),
@@ -505,6 +528,39 @@ export const AddTransactionScreen: React.FC = () => {
               </View>
             )}
 
+            {/* Pilihan jenis pengeluaran - hanya untuk expense */}
+            {transactionType === "expense" && (
+              <View style={styles.categorySection}>
+                <Text style={styles.categoryLabel}>
+                  Pilih Jenis Pengeluaran:
+                </Text>
+                <RadioButton.Group
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, expenseTypeId: value })
+                  }
+                  value={formData.expenseTypeId}
+                >
+                  {expenseTypes.map((expenseType) => (
+                    <View key={expenseType.id} style={styles.categoryItem}>
+                      <RadioButton value={expenseType.id!.toString()} />
+                      <View style={styles.categoryInfo}>
+                        <Text style={styles.categoryName}>
+                          {expenseType.name}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </RadioButton.Group>
+
+                {expenseTypes.length === 0 && (
+                  <Text style={styles.noExpenseTypeText}>
+                    Belum ada jenis pengeluaran. Silakan kelola jenis
+                    pengeluaran terlebih dahulu.
+                  </Text>
+                )}
+              </View>
+            )}
+
             <TextInput
               label="Catatan (Opsional)"
               value={formData.note}
@@ -781,5 +837,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
+  },
+  noExpenseTypeText: {
+    fontSize: 14,
+    color: "#F44336",
+    textAlign: "center",
+    fontStyle: "italic",
+    marginTop: 8,
+    paddingHorizontal: 16,
   },
 });

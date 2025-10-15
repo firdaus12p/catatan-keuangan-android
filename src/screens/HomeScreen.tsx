@@ -14,6 +14,7 @@ import { BarChart, PieChart } from "react-native-chart-kit";
 import { Appbar, Card, Chip } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
+import { database } from "../db/database";
 import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
 import { formatCurrency } from "../utils/formatCurrency";
 
@@ -35,6 +36,9 @@ export const HomeScreen: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [showCategorySelector, setShowCategorySelector] = useState(false);
+  const [expenseStats, setExpenseStats] = useState<
+    { name: string; total: number; count: number }[]
+  >([]);
 
   // Initialize app dan load data
   useFocusEffect(
@@ -53,10 +57,12 @@ export const HomeScreen: React.FC = () => {
 
           if (selectedPeriod === "current") {
             await loadMonthlyStats(currentYear, currentMonth);
+            await loadExpenseStats(currentYear, currentMonth);
           } else {
             const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
             const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
             await loadMonthlyStats(prevYear, prevMonth);
+            await loadExpenseStats(prevYear, prevMonth);
           }
         }
       };
@@ -89,10 +95,24 @@ export const HomeScreen: React.FC = () => {
 
     if (period === "current") {
       await loadMonthlyStats(currentYear, currentMonth);
+      await loadExpenseStats(currentYear, currentMonth);
     } else {
       const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
       const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
       await loadMonthlyStats(prevYear, prevMonth);
+      await loadExpenseStats(prevYear, prevMonth);
+    }
+  };
+
+  const loadExpenseStats = async (year: number, month: number) => {
+    try {
+      const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
+      const endDate = `${year}-${month.toString().padStart(2, "0")}-31`;
+      const stats = await database.getExpenseStatsByType(startDate, endDate);
+      const filteredStats = stats.filter((stat) => stat.total > 0).slice(0, 5);
+      setExpenseStats(filteredStats);
+    } catch (error) {
+      console.error("Error loading expense stats:", error);
     }
   };
 
@@ -102,10 +122,9 @@ export const HomeScreen: React.FC = () => {
   const previousMonthName = getMonthName(month === 1 ? 12 : month - 1);
 
   // Optimasi perhitungan dengan useMemo
-  const { totalBalance, categoriesWithBalance } = useMemo(() => {
-    const balance = categories.reduce((sum, cat) => sum + cat.balance, 0);
+  const { categoriesWithBalance } = useMemo(() => {
     const withBalance = categories.filter((cat) => cat.balance > 0);
-    return { totalBalance: balance, categoriesWithBalance: withBalance };
+    return { categoriesWithBalance: withBalance };
   }, [categories]);
 
   // Gunakan saldo bersih dari monthlyStats yang sudah dihitung dengan benar
@@ -184,59 +203,6 @@ export const HomeScreen: React.FC = () => {
       (cat) => cat.id && selectedCategoryIds.includes(cat.id)
     );
   }, [categories, selectedCategoryIds]);
-
-  const renderQuickActions = () => (
-    <Card style={styles.quickActionsCard} elevation={2}>
-      <Card.Content>
-        <Text style={styles.sectionTitle}>Aksi Cepat</Text>
-        <View style={styles.quickActionsGrid}>
-          <TouchableOpacity
-            style={[styles.quickActionItem, { backgroundColor: "#E8F5E8" }]}
-            onPress={() =>
-              router.push({ pathname: "/(tabs)/transaction" } as any)
-            }
-          >
-            <MaterialIcons name="trending-up" size={32} color="#4CAF50" />
-            <Text style={styles.quickActionText}>Tambah{"\n"}Pemasukan</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickActionItem, { backgroundColor: "#FFEBEE" }]}
-            onPress={() =>
-              router.push({ pathname: "/(tabs)/transaction" } as any)
-            }
-          >
-            <MaterialIcons name="trending-down" size={32} color="#F44336" />
-            <Text style={styles.quickActionText}>Tambah{"\n"}Pengeluaran</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickActionItem, { backgroundColor: "#E3F2FD" }]}
-            onPress={() => router.push({ pathname: "/(tabs)/category" } as any)}
-          >
-            <MaterialIcons name="category" size={32} color="#2196F3" />
-            <Text style={styles.quickActionText}>Kelola{"\n"}Kategori</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickActionItem, { backgroundColor: "#FFF3E0" }]}
-            onPress={() => router.push({ pathname: "/(tabs)/loan" } as any)}
-          >
-            <MaterialIcons name="handshake" size={32} color="#FF9800" />
-            <Text style={styles.quickActionText}>Kelola{"\n"}Pinjaman</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickActionItem, { backgroundColor: "#FFEBEE" }]}
-            onPress={() => router.push("/reset" as any)}
-          >
-            <MaterialIcons name="refresh" size={32} color="#F44336" />
-            <Text style={styles.quickActionText}>Reset{"\n"}Data</Text>
-          </TouchableOpacity>
-        </View>
-      </Card.Content>
-    </Card>
-  );
 
   const renderFinancialSummary = () => (
     <Card style={styles.summaryCard} elevation={2}>
@@ -479,20 +445,101 @@ export const HomeScreen: React.FC = () => {
     </View>
   );
 
+  const renderExpenseAnalytics = () => {
+    const totalExpense = expenseStats.reduce(
+      (sum, stat) => sum + stat.total,
+      0
+    );
+
+    return (
+      <Card style={styles.summaryCard} elevation={2}>
+        <Card.Content>
+          <View style={styles.cardHeader}>
+            <MaterialIcons name="analytics" size={24} color="#673AB7" />
+            <Text style={styles.sectionTitle}>Analisis Pengeluaran</Text>
+          </View>
+
+          <Text style={styles.cardSubtitle}>
+            {selectedPeriod === "current" ? "Bulan Ini" : "Bulan Lalu"}
+          </Text>
+
+          <View style={styles.totalExpenseContainer}>
+            <Text style={styles.totalExpenseLabel}>Total Pengeluaran</Text>
+            <Text style={styles.totalExpenseAmount}>
+              {formatCurrency(totalExpense)}
+            </Text>
+          </View>
+
+          {expenseStats.length > 0 ? (
+            <View style={styles.expenseStatsContainer}>
+              {expenseStats.slice(0, 3).map((stat, index) => (
+                <View key={index} style={styles.expenseStatItem}>
+                  <View style={styles.expenseStatLeft}>
+                    <Text style={styles.expenseStatName}>{stat.name}</Text>
+                    <Text style={styles.expenseStatCount}>
+                      {stat.count} transaksi
+                    </Text>
+                  </View>
+                  <View style={styles.expenseStatRight}>
+                    <Text style={styles.expenseStatAmount}>
+                      {formatCurrency(stat.total)}
+                    </Text>
+                    <Text style={styles.expenseStatPercentage}>
+                      {totalExpense > 0
+                        ? ((stat.total / totalExpense) * 100).toFixed(1)
+                        : "0"}
+                      %
+                    </Text>
+                  </View>
+                </View>
+              ))}
+
+              {expenseStats.length > 3 && (
+                <TouchableOpacity
+                  style={styles.viewMoreButton}
+                  onPress={() => {
+                    // Navigate to full analytics - could be implemented as modal or new screen
+                  }}
+                >
+                  <Text style={styles.viewMoreText}>
+                    Lihat {expenseStats.length - 3} lainnya →
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.emptyExpenseContainer}>
+              <MaterialIcons name="receipt" size={48} color="#CCCCCC" />
+              <Text style={styles.emptyExpenseText}>
+                Belum ada data pengeluaran
+              </Text>
+            </View>
+          )}
+        </Card.Content>
+      </Card>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
         <Appbar.Content
-          title="💸 Kemenku"
+          title="💸 CatatKu"
           subtitle="Aplikasi Catatan Keuangan"
           titleStyle={styles.headerTitle}
           subtitleStyle={styles.headerSubtitle}
         />
         <Appbar.Action
+          icon="bell"
+          iconColor="#FFFFFF"
+          onPress={() => router.push("/notification" as any)}
+          style={{ marginTop: -23 }}
+        />
+        <Appbar.Action
           icon="cog"
           iconColor="#FFFFFF"
-          onPress={() => router.push("/reset" as any)}
-          style={{ marginTop: -20 }}
+          onPress={() => router.push("/settings" as any)}
+          style={{ marginTop: -23 }}
         />
       </Appbar.Header>
 
@@ -503,6 +550,7 @@ export const HomeScreen: React.FC = () => {
       >
         {renderFinancialSummary()}
         {renderCategoryBalances()}
+        {renderExpenseAnalytics()}
         {renderCharts()}
       </ScrollView>
     </SafeAreaView>
@@ -534,7 +582,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 75,
+    paddingBottom: 120, // Increased for better spacing
   },
   sectionTitle: {
     fontSize: 18,
@@ -727,5 +775,89 @@ const styles = StyleSheet.create({
     color: "#CCC",
     marginTop: 4,
     textAlign: "center",
+    paddingHorizontal: 20,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  totalExpenseContainer: {
+    backgroundColor: "#F3E5F5",
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 12,
+    alignItems: "center",
+  },
+  totalExpenseLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 4,
+  },
+  totalExpenseAmount: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#673AB7",
+  },
+  expenseStatsContainer: {
+    marginTop: 8,
+  },
+  expenseStatItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  expenseStatLeft: {
+    flex: 1,
+  },
+  expenseStatName: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+    marginBottom: 2,
+  },
+  expenseStatCount: {
+    fontSize: 12,
+    color: "#666",
+  },
+  expenseStatRight: {
+    alignItems: "flex-end",
+  },
+  expenseStatAmount: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#673AB7",
+    marginBottom: 2,
+  },
+  expenseStatPercentage: {
+    fontSize: 12,
+    color: "#999",
+  },
+  viewMoreButton: {
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  viewMoreText: {
+    fontSize: 14,
+    color: "#673AB7",
+    fontWeight: "500",
+  },
+  emptyExpenseContainer: {
+    alignItems: "center",
+    paddingVertical: 24,
+  },
+  emptyExpenseText: {
+    fontSize: 14,
+    color: "#999",
+    marginTop: 8,
   },
 });

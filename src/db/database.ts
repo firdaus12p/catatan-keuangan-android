@@ -14,6 +14,7 @@ export interface Transaction {
   type: "income" | "expense";
   amount: number;
   category_id: number;
+  expense_type_id?: number; // Nullable untuk backward compatibility
   note: string;
   date: string;
 }
@@ -35,6 +36,13 @@ export interface LoanPayment {
   amount: number;
   payment_date: string;
   remaining_amount: number;
+}
+
+// Interface untuk tabel expense_types
+export interface ExpenseType {
+  id?: number;
+  name: string;
+  created_at: string;
 }
 
 class Database {
@@ -61,9 +69,11 @@ class Database {
           type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
           amount REAL NOT NULL,
           category_id INTEGER NOT NULL,
+          expense_type_id INTEGER,
           note TEXT,
           date TEXT NOT NULL,
-          FOREIGN KEY (category_id) REFERENCES categories (id)
+          FOREIGN KEY (category_id) REFERENCES categories (id),
+          FOREIGN KEY (expense_type_id) REFERENCES expense_types (id)
         );
       `);
 
@@ -92,6 +102,15 @@ class Database {
         );
       `);
 
+      // Buat tabel expense_types untuk jenis pengeluaran
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS expense_types (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL
+        );
+      `);
+
       // Buat index untuk performa
       await this.db.execAsync(`
         CREATE INDEX IF NOT EXISTS idx_category_id ON transactions(category_id);
@@ -103,6 +122,12 @@ class Database {
 
       // Insert kategori default jika belum ada
       await this.insertDefaultCategories();
+
+      // Insert expense types default jika belum ada
+      await this.insertDefaultExpenseTypes();
+
+      // Migration untuk existing database
+      await this.migrateExistingDatabase();
 
       // Database initialized successfully - ready for production
     } catch (error) {
@@ -142,6 +167,64 @@ class Database {
     } catch (error) {
       console.error("Error inserting default categories:", error);
       throw error;
+    }
+  }
+
+  // Insert default expense types
+  private async insertDefaultExpenseTypes(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+
+    try {
+      const existingExpenseTypes = await this.db.getAllAsync(
+        "SELECT COUNT(*) as count FROM expense_types"
+      );
+      const count = (existingExpenseTypes[0] as { count: number }).count;
+
+      if (count === 0) {
+        const defaultExpenseTypes = [
+          "Makanan",
+          "Minuman",
+          "Transportasi",
+          "Belanja",
+          "Hiburan",
+        ];
+
+        for (const expenseType of defaultExpenseTypes) {
+          await this.db.runAsync(
+            "INSERT INTO expense_types (name, created_at) VALUES (?, ?)",
+            [expenseType, new Date().toISOString()]
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error inserting default expense types:", error);
+      throw error;
+    }
+  }
+
+  // Migration untuk database yang sudah ada
+  private async migrateExistingDatabase(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+
+    try {
+      // Check jika kolom expense_type_id sudah ada di transactions table
+      const tableInfo = await this.db.getAllAsync(
+        "PRAGMA table_info(transactions)"
+      );
+
+      const hasExpenseTypeColumn = tableInfo.some(
+        (column: any) => column.name === "expense_type_id"
+      );
+
+      if (!hasExpenseTypeColumn) {
+        // Tambahkan kolom expense_type_id ke table transactions yang sudah ada
+        await this.db.execAsync(`
+          ALTER TABLE transactions ADD COLUMN expense_type_id INTEGER REFERENCES expense_types(id);
+        `);
+      }
+    } catch (error) {
+      console.error("Error migrating existing database:", error);
+      // Don't throw error, migration might fail if column already exists
     }
   }
 
@@ -219,11 +302,12 @@ class Database {
     if (!this.db) throw new Error("Database not initialized");
     try {
       const result = await this.db.runAsync(
-        "INSERT INTO transactions (type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO transactions (type, amount, category_id, expense_type_id, note, date) VALUES (?, ?, ?, ?, ?, ?)",
         [
           transaction.type,
           transaction.amount,
           transaction.category_id,
+          transaction.expense_type_id || null,
           transaction.note,
           transaction.date,
         ]
@@ -541,6 +625,124 @@ class Database {
       // Loan-related transactions cleaned up successfully
     } catch (error) {
       console.error("Error cleaning up loan transactions:", error);
+      throw error;
+    }
+  }
+
+  // CRUD untuk Expense Types
+  async getAllExpenseTypes(): Promise<ExpenseType[]> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      return await this.db.getAllAsync(
+        "SELECT * FROM expense_types ORDER BY name"
+      );
+    } catch (error) {
+      console.error("Error getting expense types:", error);
+      throw error;
+    }
+  }
+
+  async addExpenseType(expenseType: Omit<ExpenseType, "id">): Promise<number> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      const result = await this.db.runAsync(
+        "INSERT INTO expense_types (name, created_at) VALUES (?, ?)",
+        [expenseType.name, expenseType.created_at]
+      );
+      return result.lastInsertRowId;
+    } catch (error) {
+      console.error("Error adding expense type:", error);
+      throw error;
+    }
+  }
+
+  async updateExpenseType(
+    id: number,
+    expenseType: Omit<ExpenseType, "id">
+  ): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      await this.db.runAsync("UPDATE expense_types SET name = ? WHERE id = ?", [
+        expenseType.name,
+        id,
+      ]);
+    } catch (error) {
+      console.error("Error updating expense type:", error);
+      throw error;
+    }
+  }
+
+  async deleteExpenseType(id: number): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      // Check if expense type is used in any transactions
+      const usageCount = (await this.db.getFirstAsync(
+        "SELECT COUNT(*) as count FROM transactions WHERE expense_type_id = ?",
+        [id]
+      )) as { count: number };
+
+      if (usageCount.count > 0) {
+        throw new Error(
+          "Cannot delete expense type that is used in transactions"
+        );
+      }
+
+      await this.db.runAsync("DELETE FROM expense_types WHERE id = ?", [id]);
+    } catch (error) {
+      console.error("Error deleting expense type:", error);
+      throw error;
+    }
+  }
+
+  // Analytics untuk expense types
+  async getExpenseStatsByType(
+    startDate?: string,
+    endDate?: string
+  ): Promise<{ name: string; total: number; count: number }[]> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      let query = `
+        SELECT 
+          et.name,
+          COALESCE(SUM(t.amount), 0) as total,
+          COUNT(t.id) as count
+        FROM expense_types et
+        LEFT JOIN transactions t ON et.id = t.expense_type_id AND t.type = 'expense'
+      `;
+
+      const params: any[] = [];
+      if (startDate && endDate) {
+        query += " WHERE t.date BETWEEN ? AND ?";
+        params.push(startDate, endDate);
+      }
+
+      query += " GROUP BY et.id, et.name ORDER BY total DESC";
+
+      return await this.db.getAllAsync(query, params);
+    } catch (error) {
+      console.error("Error getting expense stats by type:", error);
+      throw error;
+    }
+  }
+
+  async getTransactionsWithExpenseType(
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<(Transaction & { expense_type_name?: string })[]> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      return await this.db.getAllAsync(
+        `SELECT 
+          t.*,
+          et.name as expense_type_name
+        FROM transactions t
+        LEFT JOIN expense_types et ON t.expense_type_id = et.id
+        ORDER BY t.date DESC 
+        LIMIT ? OFFSET ?`,
+        [limit, offset]
+      );
+    } catch (error) {
+      console.error("Error getting transactions with expense type:", error);
       throw error;
     }
   }

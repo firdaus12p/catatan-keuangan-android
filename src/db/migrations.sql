@@ -16,9 +16,18 @@ CREATE TABLE IF NOT EXISTS transactions (
   type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
   amount REAL NOT NULL,
   category_id INTEGER NOT NULL,
+  expense_type_id INTEGER,
   note TEXT,
   date TEXT NOT NULL,
-  FOREIGN KEY (category_id) REFERENCES categories (id)
+  FOREIGN KEY (category_id) REFERENCES categories (id),
+  FOREIGN KEY (expense_type_id) REFERENCES expense_types (id)
+);
+
+-- Tabel untuk menyimpan jenis pengeluaran
+CREATE TABLE IF NOT EXISTS expense_types (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
 );
 
 -- Tabel untuk menyimpan data pinjaman
@@ -34,6 +43,7 @@ CREATE TABLE IF NOT EXISTS loans (
 
 -- Index untuk meningkatkan performa query
 CREATE INDEX IF NOT EXISTS idx_category_id ON transactions(category_id);
+CREATE INDEX IF NOT EXISTS idx_expense_type_id ON transactions(expense_type_id);
 CREATE INDEX IF NOT EXISTS idx_date ON transactions(date);
 CREATE INDEX IF NOT EXISTS idx_loan_status ON loans(status);
 
@@ -45,3 +55,11 @@ INSERT OR IGNORE INTO categories (name, percentage, balance) VALUES
 ('Tabungan', 15, 0),
 ('Operasional', 10, 0),
 ('Maintenance', 10, 0);
+
+-- Data default jenis pengeluaran
+INSERT OR IGNORE INTO expense_types (name, created_at) VALUES
+('Makanan', datetime('now')),
+('Minuman', datetime('now')),
+('Transportasi', datetime('now')),
+('Belanja', datetime('now')),
+('Hiburan', datetime('now'));

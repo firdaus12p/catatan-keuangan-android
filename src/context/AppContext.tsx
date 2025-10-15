@@ -24,7 +24,7 @@ interface AppContextType {
   deleteCategory: (id: number) => Promise<void>;
 
   // Transactions
-  transactions: Transaction[];
+  transactions: (Transaction & { expense_type_name?: string })[];
   loadTransactions: (limit?: number, offset?: number) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, "id">) => Promise<void>;
   addGlobalIncome: (amount: number, note?: string) => Promise<void>;
@@ -84,7 +84,9 @@ interface AppProviderProps {
 // Provider Component
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<
+    (Transaction & { expense_type_name?: string })[]
+  >([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({
     totalIncome: 0,
@@ -176,7 +178,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     offset: number = 0
   ): Promise<void> => {
     try {
-      const data = await database.getTransactions(limit, offset);
+      const data = await database.getTransactionsWithExpenseType(limit, offset);
       setTransactions(data);
     } catch (error) {
       console.error("Error loading transactions:", error);

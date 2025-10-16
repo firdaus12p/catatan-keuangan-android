@@ -2,14 +2,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
   Button,
@@ -442,7 +436,12 @@ export const AddTransactionScreen: React.FC = () => {
           onDismiss={closeModal}
           contentContainerStyle={styles.modalContainer}
         >
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <KeyboardAwareScrollView
+            showsVerticalScrollIndicator={false}
+            enableOnAndroid={true}
+            extraScrollHeight={20}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={styles.modalTitle}>
               Tambah{" "}
               {transactionType === "income" ? "Pemasukan" : "Pengeluaran"}
@@ -547,7 +546,7 @@ export const AddTransactionScreen: React.FC = () => {
                 Simpan
               </Button>
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </Modal>
       </Portal>
     </SafeAreaView>

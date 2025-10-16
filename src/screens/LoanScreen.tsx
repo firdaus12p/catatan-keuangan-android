@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
   Button,
@@ -568,7 +569,12 @@ export const LoanScreen: React.FC = () => {
           onDismiss={closeModal}
           contentContainerStyle={styles.modalContainer}
         >
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <KeyboardAwareScrollView
+            showsVerticalScrollIndicator={false}
+            enableOnAndroid={true}
+            extraScrollHeight={20}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={styles.modalTitle}>Tambah Pinjaman Baru</Text>
 
             <TextInput
@@ -632,7 +638,7 @@ export const LoanScreen: React.FC = () => {
                 Tambah
               </Button>
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </Modal>
       </Portal>
 

@@ -1,14 +1,8 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
   Button,
@@ -231,7 +225,11 @@ export const CategoryScreen: React.FC = () => {
           onDismiss={closeModal}
           contentContainerStyle={styles.modalContainer}
         >
-          <ScrollView>
+          <KeyboardAwareScrollView
+            enableOnAndroid={true}
+            extraScrollHeight={20}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={styles.modalTitle}>
               {editingCategory ? "Edit Kategori" : "Tambah Kategori"}
             </Text>
@@ -284,7 +282,7 @@ export const CategoryScreen: React.FC = () => {
                 {editingCategory ? "Perbarui" : "Tambah"}
               </Button>
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </Modal>
       </Portal>
     </SafeAreaView>

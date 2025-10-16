@@ -1,168 +1,144 @@
-# ⚙️ Instruksi GitHub Copilot untuk Proyek CatatKu (Aplikasi Catatan Keuangan)
+# ⚙️ Instruksi GitHub Copilot untuk Kemenku (Aplikasi Keuangan Pribadi)
 
-## 🧩 Gambaran Umum Proyek
+## 🧙️ Gambaran Proyek
 
-Aplikasi pencatat keuangan pribadi berbahasa Indonesia yang dibuat menggunakan **React Native Expo** dan **SQLite**.  
-Nama aplikasi: **CatatKu**.  
-Aplikasi ini memiliki arsitektur **offline-first** dengan fitur:
-- Pembagian otomatis berdasarkan kategori.
-- Pencatatan pemasukan dan pengeluaran.
-- Manajemen pinjaman (utang/piutang).
+**Kemenku** adalah aplikasi pencatat keuangan pribadi berprinsip offline-first yang dibangun dengan **React Native Expo** dan **SQLite**.
+Fitur utama: distribusi pendapatan otomatis berbasis kategori, pencatatan pengeluaran, dan manajemen pinjaman.
 
----
+## 🎗️ Arsitektur & Pola Kritis
 
-## 🏗️ Arsitektur & Pola Utama
+### 🗂️ Struktur Berkas
 
-### 📂 Struktur Direktori
+```
+app/                    # Routing berbasis file Expo Router v6 (setup minimal)
+├── (tabs)/             # Layout navigasi tab
+├── index.tsx           # Splash screen dengan delay 2 detik → /(tabs)/
+src/                    # Kode utama aplikasi
+├── screens/            # Komponen halaman (HomeScreen.tsx, dll.)
+├── components/         # Komponen UI yang dapat digunakan kembali
+├── db/database.ts      # Singleton SQLite dengan sistem migrasi
+├── context/AppContext.tsx # Manajemen state global
+├── styles/commonStyles.ts # Warna tema dan gaya bersama
+└── utils/              # Fungsi pembantu (formatCurrency, dateHelper)
+```
 
-app/               # Routing berbasis file menggunakan Expo Router v6 (setup minimal)  
-app-example/       # Implementasi referensi dengan tab, tema, dan komponen  
-src/               # Struktur utama sesuai tasklist.md:  
-├── screens/       # Halaman utama aplikasi (HomeScreen, CategoryScreen, dll)  
-├── components/    # Komponen UI yang dapat digunakan kembali  
-├── db/            # Lapisan database SQLite  
-├── context/       # Context React untuk state global  
-├── utils/         # Fungsi bantu (helper functions)  
-└── assets/        # Gambar, ikon, dan aset lainnya  
+### 🧱 Desain Database (SQLite dengan expo-sqlite)
 
----
+```sql
+categories: id, name, percentage, balance
+transactions: id, type(income/expense), amount, category_id, note, date
+loans: id, name, amount, category_id, status(unpaid/half/paid), date
+-- Indexed: category_id, date untuk performa
+```
 
-### 🧱 Skema Database (SQLite dengan expo-sqlite)
+### 🧠 Pola Manajemen State
 
-categories: id, name, percentage, balance  
-transactions: id, type(income/expense), amount, category_id, note, date  
-loans: id, name, amount, category_id, status(unpaid/half/paid), date  
--- Index: category_id, date (untuk meningkatkan performa query)  
+* **Global State**: `AppContext.tsx` dengan fungsi yang dioptimalkan `useCallback`
+* **Akses Database**: Singleton langsung (`database.ts`)
+* **Penyegaran Layar**: `useFocusEffect()` untuk memuat ulang data saat layar aktif
+* **Status Loading**: Context menyediakan boolean loading untuk operasi async
 
----
+## 💡 Logika Bisnis Inti
 
-## 💡 Logika Bisnis Utama
+### 🎯 Sistem Kategori
 
-- **Pembagian Otomatis:** Pemasukan global dibagi ke kategori sesuai persentase (misalnya: Sedekah 10%, Belanja 40%, Tabungan 15%).  
-- **Pemasukan per Kategori:** Bisa menambahkan pemasukan langsung ke satu kategori tanpa memengaruhi lainnya.  
-- **Pencatatan Pinjaman:** Uang berkurang dari kategori saat dipinjam, dan kembali saat pembayaran.  
-- **Offline-First:** Tidak menggunakan API eksternal — hanya SQLite lokal.
+* **Distribusi otomatis**: Pendapatan global dibagi ke kategori berdasarkan persentase (total harus ≤100%)
+* **Pendapatan langsung**: Tambah pendapatan ke kategori spesifik tanpa memengaruhi yang lain
+* **Pelacakan saldo**: Tiap kategori menjaga saldo berjalan yang diperbarui oleh transaksi
 
----
+### 💸 Pemrosesan Transaksi
 
-## ⚙️ Panduan Pengembangan
-
-### 🧩 Standar Penulisan Kode
-
-- **Bahasa:** TypeScript (mode strict diaktifkan).  
-- **Navigasi:** Menggunakan Expo Router v6 (berbasis file).  
-- **State:** React Context API + Hooks (useState, useEffect, useFocusEffect).  
-- **Database:** Semua operasi SQLite menggunakan async/await + try/catch, serta menerapkan pagination (LIMIT/OFFSET).  
-- **Komentar:** Gunakan Bahasa Indonesia untuk logika bisnis, dan Bahasa Inggris untuk komentar teknis.
-
----
-
-### ⚡ Persyaratan Performa
-
-- Target: Android 8 ke atas dengan RAM minimal 3GB.  
-- Gunakan **lazy loading** atau **pagination** untuk data besar.  
-- Gunakan **indexing** di kolom database yang sering diakses.  
-- Optimalkan agar tetap cepat meski tanpa koneksi internet.
-
----
-
-### 🎨 Konvensi UI/UX
-
-- Warna: pastel lembut (biru muda, hijau muda).  
-- Ikon: gunakan `@expo/vector-icons` dengan label teks.  
-- Navigasi: bottom tabs atau drawer navigation.  
-- Gunakan indikator loading untuk proses asinkron.  
-- Desain harus responsif di berbagai ukuran layar Android.
-
----
-
-## 🔄 Alur Kerja Utama dalam Pengembangan
-
-### 🚀 Memulai Proyek
-
-npm install  
-npx expo start  
-# Uji di emulator atau perangkat Android  
-
----
-
-### 🧠 Operasi Database
-
-- Semua operasi SQLite wajib menggunakan async/await dan memiliki penanganan error.  
-- Gunakan `useFocusEffect()` untuk memperbarui data saat halaman aktif.  
-- Terapkan pagination agar daftar transaksi tidak membuat aplikasi lambat.
-
----
-
-### 🔁 Reset Proyek (Jika Diperlukan)
-
-npm run reset-project  
-# Memindahkan app-example sebagai referensi, lalu membuat app/ kosong untuk pengembangan baru  
-
----
-
-## 🧩 Catatan Implementasi Penting
-
-### 📊 Sistem Kategori
-
-- Total persentase kategori **tidak boleh melebihi 100%**.  
-- Saldo kategori diperbarui otomatis setiap transaksi.  
-- Penghapusan kategori harus memastikan tidak ada transaksi yang masih terkait.
-
----
-
-### 💸 Proses Transaksi
-
-- **Pemasukan Global:** Dibagi otomatis ke semua kategori berdasarkan persentase.  
-- **Pemasukan Khusus:** Hanya ditambahkan ke kategori yang dipilih.  
-- **Pengeluaran:** Mengurangi saldo dari kategori terkait.  
-- Selalu pastikan saldo kategori cukup sebelum melakukan pengeluaran.
-
----
+```typescript
+// Pola: Selalu validasi saldo kategori sebelum pengeluaran
+const addTransaction = async (transaction: Omit<Transaction, "id">) => {
+  if (transaction.type === "expense") {
+    // Validasi saldo kategori mencukupi
+  }
+  await database.addTransaction(transaction);
+  await loadCategories(); // Segarkan saldo
+};
+```
 
 ### 🤝 Manajemen Pinjaman
 
-- Saat membuat pinjaman: nominal dikurangi dari kategori sumber.  
-- Saat pembayaran sebagian: sebagian saldo dikembalikan ke kategori asal.  
-- Saat pembayaran penuh: saldo dikembalikan seluruhnya ke kategori asal.  
-- Status pinjaman harus dilacak: unpaid → half → paid.
+* **Alur uang**: Pembuatan pinjaman mengurangi saldo kategori → pembayaran mengembalikan saldo
+* **Pelacakan status**: `unpaid` → `half` → `paid` dengan dukungan pembayaran sebagian
 
----
+## ⚙️ Pola Pengembangan
 
-## 📁 Penamaan File & Organisasi
+### 🧙️ Standar Kode
 
-- **Screens:** Gunakan PascalCase, contoh: `CategoryScreen.tsx`.  
-- **Components:** Gunakan PascalCase, contoh: `CategoryCard.tsx`.  
-- **Utils:** Gunakan camelCase, contoh: `formatCurrency.ts`.  
-- Jangan buat file sementara seperti `test.js`, `debug.js`, atau `temp.js`.  
-- Komentar logika bisnis ditulis dalam Bahasa Indonesia, komentar teknis dalam Bahasa Inggris.
+* **TypeScript**: Strict mode aktif dengan interface yang tepat
+* **Navigasi**: Routing berbasis file memakai Expo Router v6
+* **Database**: Semua operasi gunakan `async/await` dengan try/catch, paginasi dengan LIMIT/OFFSET
+* **Performa**: `useCallback` untuk fungsi context, `useMemo` untuk perhitungan berat
 
----
+### 🎨 Konvensi UI/UX
 
-## 🧩 Dependensi & Versi yang Digunakan
+* **Warna**: Gunakan objek `colors` dari `commonStyles.ts` (penamaan semantik: `colors.income`, `colors.expense`)
+* **Ikon**: `@expo/vector-icons/MaterialIcons` dengan label teks
+* **Komponen**: `react-native-paper` untuk Material Design yang konsisten
+* **Grafik**: `react-native-chart-kit` untuk visualisasi data
 
-- Expo SDK ~54.0  
-- React 19.1.0  
-- TypeScript ~5.9.2  
-- expo-router ~6.0 (routing berbasis file)  
-- expo-sqlite (untuk database lokal)  
-- @react-navigation (untuk komponen navigasi)  
-- react-native-chart-kit (untuk visualisasi statistik)
+### 🛠️ Alur Pengembangan
 
----
+```bash
+npm install
+npx expo start              # Server pengembangan
+npx expo start --clear      # Bersihkan cache bila perlu
+npm run reset-project       # Pindahkan app-example sebagai referensi, buat app/ kosong
+```
 
-## 🧪 Pengujian & Validasi
+## 🗄️ Operasi Database
 
-- Uji semua operasi CRUD di perangkat/emulator Android nyata.  
-- Verifikasi logika pembagian otomatis kategori (total dan persentase).  
-- Uji pagination dengan data besar untuk memastikan performa tetap baik.  
-- Pastikan aplikasi dapat berfungsi sepenuhnya tanpa koneksi internet.  
-- Periksa tampilan agar tetap responsif di berbagai ukuran layar.
+### Pola Migrasi
 
----
+```typescript
+// database.ts inisialisasi dengan pembaruan skema otomatis
+await this.db.execAsync(`CREATE TABLE IF NOT EXISTS...`);
+await this.addColumnIfNotExists("table", "column", "TYPE");
+```
 
-### 📘 Referensi
-Gunakan file berikut sebagai referensi dan acuan utama pengembangan proyek:
-- `aturan.md`
-- `prompt.md`
-- `tasklist.md`
+### Pola Pemanggilan Data
+
+```typescript
+// Selalu gunakan useFocusEffect untuk penyegaran data saat layar aktif
+useFocusEffect(
+  React.useCallback(() => {
+    loadCategories();
+    loadTransactions();
+  }, [])
+);
+```
+
+## 🗁 Penamaan & Organisasi Berkas
+
+* **Screens**: PascalCase → `CategoryScreen.tsx`
+* **Components**: PascalCase → `CategoryCard.tsx`
+* **Utils**: camelCase → `formatCurrency.ts`
+* **Komentar**: Logika bisnis dalam Bahasa Indonesia, komentar teknis dalam Bahasa Inggris
+* **Tanpa berkas sementara**: Hindari `test.js`, `debug.js`, `temp.js`
+
+## 🥪 Pengujian & Validasi
+
+* Uji semua operasi CRUD pada perangkat/emulator Android nyata
+* Verifikasi validasi persentase kategori (total ≤100%)
+* Uji paginasi dengan dataset besar
+* Pastikan fungsi offline (tanpa dependensi API eksternal)
+* Validasi desain responsif di berbagai ukuran layar Android
+
+## 📘 Dependensi Utama
+
+* Expo SDK ~54.0, React 19.1.0, TypeScript ~5.9.2
+* expo-router ~6.0 (routing berbasis file)
+* expo-sqlite (database lokal)
+* react-native-paper (komponen Material Design)
+* react-native-chart-kit (visualisasi data)
+
+## 🚨 Hal Penting (Gotchas)
+
+* Gunakan `useFocusEffect()` alih-alih `useEffect()` untuk pemuatan data layar
+* Selalu bungkus fungsi context dengan `useCallback` untuk mencegah loop tak berujung
+* Validasi saldo kategori sebelum mengizinkan pengeluaran
+* Gunakan paginasi untuk daftar transaksi agar performa terjaga
+* Aplikasi 100% offline — tanpa dependensi jaringan

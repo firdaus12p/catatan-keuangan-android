@@ -456,7 +456,7 @@ export const LoanScreen: React.FC = () => {
   const paidLoans = loans.filter((loan) => loan.status === "paid").length;
   const totalAmount = loans.reduce((sum, loan) => sum + loan.amount, 0);
   const unpaidAmount = loans
-    .filter((loan) => loan.status === "unpaid")
+    .filter((loan) => loan.status === "unpaid" || loan.status === "half")
     .reduce((sum, loan) => sum + loan.amount, 0);
 
   const renderHeader = () => (

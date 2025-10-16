@@ -20,6 +20,7 @@ import {
   Switch,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { colors } from "../styles/commonStyles";
 import {
   NotificationSettings,
   cancelScheduledNotification,
@@ -450,7 +451,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
   },
   header: {
-    backgroundColor: "#2196F3",
+    backgroundColor: colors.notification,
     elevation: 4,
     height: 20,
     minHeight: 10,
@@ -522,7 +523,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.notification,
     marginBottom: 8,
   },
   listItem: {

@@ -26,6 +26,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { TransactionItem } from "../components/TransactionItem";
 import { useApp } from "../context/AppContext";
 import { Transaction } from "../db/database";
+import { colors } from "../styles/commonStyles";
 import {
   formatDate,
   getCurrentMonthYear,
@@ -559,7 +560,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
   },
   header: {
-    backgroundColor: "#2196F3",
+    backgroundColor: colors.income,
     elevation: 4,
     height: 20,
     minHeight: 10,
@@ -592,7 +593,7 @@ const styles = StyleSheet.create({
   statsTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.income,
     marginBottom: 16,
     textAlign: "center",
   },
@@ -657,7 +658,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.income,
     marginBottom: 20,
     textAlign: "center",
   },
@@ -673,7 +674,7 @@ const styles = StyleSheet.create({
   globalIncomeTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.income,
     marginLeft: 8,
   },
   globalIncomeDescription: {
@@ -744,7 +745,7 @@ const styles = StyleSheet.create({
   historyTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.income,
     marginLeft: 8,
   },
   historySubtitle: {

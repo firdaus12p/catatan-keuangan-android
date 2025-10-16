@@ -15,6 +15,7 @@ import { BarChart, PieChart } from "react-native-chart-kit";
 import { Appbar, Card, Chip } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
+import { colors } from "../styles/commonStyles";
 import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
 import { formatCurrency } from "../utils/formatCurrency";
 
@@ -555,7 +556,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
   },
   header: {
-    backgroundColor: "#2196F3",
+    backgroundColor: colors.home,
     elevation: 4,
     height: 20,
     minHeight: 10,
@@ -579,7 +580,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.home,
     marginBottom: 16,
     textAlign: "center",
   },

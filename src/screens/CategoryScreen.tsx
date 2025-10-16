@@ -22,6 +22,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CategoryCard } from "../components/CategoryCard";
 import { useApp } from "../context/AppContext";
 import { Category } from "../db/database";
+import { colors } from "../styles/commonStyles";
 import { formatCurrency } from "../utils/formatCurrency";
 
 export const CategoryScreen: React.FC = () => {
@@ -296,7 +297,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
   },
   header: {
-    backgroundColor: "#2196F3",
+    backgroundColor: colors.category,
     elevation: 4,
     height: 20,
     minHeight: 10,
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.category,
     marginBottom: 12,
     textAlign: "center",
   },

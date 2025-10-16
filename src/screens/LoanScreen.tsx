@@ -25,6 +25,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
 import { Category, Loan, LoanPayment } from "../db/database";
+import { colors } from "../styles/commonStyles";
 import { formatDate, getTodayString } from "../utils/dateHelper";
 import {
   formatCurrency,
@@ -711,7 +712,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
   },
   header: {
-    backgroundColor: "#2196F3",
+    backgroundColor: colors.loan,
     elevation: 4,
     height: 20,
     minHeight: 10,
@@ -731,7 +732,7 @@ const styles = StyleSheet.create({
   filterTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333333",
+    color: colors.loan,
     marginBottom: 8,
   },
   filterChips: {
@@ -750,7 +751,7 @@ const styles = StyleSheet.create({
   statsTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.loan,
     marginBottom: 16,
     textAlign: "center",
   },
@@ -845,7 +846,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.loan,
     marginBottom: 20,
     textAlign: "center",
   },

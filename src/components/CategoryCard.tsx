@@ -3,6 +3,7 @@ import React from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { Card, IconButton, ProgressBar } from "react-native-paper";
 import { Category } from "../db/database";
+import { colors } from "../styles/commonStyles";
 import { formatCurrency } from "../utils/formatCurrency";
 
 interface CategoryCardProps {
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333333",
+    color: colors.category,
     marginBottom: 2,
   },
   percentage: {

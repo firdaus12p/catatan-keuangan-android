@@ -24,7 +24,7 @@ import {
   TextInput,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useApp } from "../context/AppContext";
+import { useAppContext } from "../context/AppContext";
 import { Category, Loan, LoanPayment } from "../db/database";
 import { colors } from "../styles/commonStyles";
 import { formatDate, getTodayString } from "../utils/dateHelper";
@@ -269,7 +269,7 @@ export const LoanScreen: React.FC = () => {
     updateLoanStatus,
     deleteLoan,
     getLoanPayments,
-  } = useApp();
+  } = useAppContext();
 
   const { action } = useLocalSearchParams<{ action?: string }>();
   const router = useRouter();

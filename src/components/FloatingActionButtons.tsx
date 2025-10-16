@@ -3,13 +3,13 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { Alert, StyleSheet } from "react-native";
 import { FAB, Portal } from "react-native-paper";
-import { useApp } from "../context/AppContext";
+import { useAppContext } from "../context/AppContext";
 import { colors } from "../styles/commonStyles";
 
 export const FloatingActionButtons: React.FC = React.memo(() => {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { categories } = useApp();
+  const { categories } = useAppContext();
 
   // Hitung total persentase alokasi dari semua kategori
   const totalAllocationPercentage = useMemo(() => {

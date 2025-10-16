@@ -18,7 +18,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TransactionItem } from "../components/TransactionItem";
-import { useApp } from "../context/AppContext";
+import { useAppContext } from "../context/AppContext";
 import { Transaction } from "../db/database";
 import { colors } from "../styles/commonStyles";
 import {
@@ -37,11 +37,12 @@ export const AddTransactionScreen: React.FC = () => {
   const {
     categories,
     transactions,
+    expenseTypes,
     loadCategories,
     loadTransactions,
     addTransaction,
     addGlobalIncome,
-  } = useApp();
+  } = useAppContext();
 
   const { action } = useLocalSearchParams<{ action?: string }>();
   const router = useRouter();
@@ -54,6 +55,7 @@ export const AddTransactionScreen: React.FC = () => {
   const [formData, setFormData] = useState({
     amount: "",
     categoryId: "",
+    expenseTypeId: "", // Tambahan untuk jenis pengeluaran
     note: "",
   });
   const [filter, setFilter] = useState<"all" | "current" | "previous">(
@@ -114,6 +116,7 @@ export const AddTransactionScreen: React.FC = () => {
     setFormData({
       amount: "",
       categoryId: "",
+      expenseTypeId: "",
       note: "",
     });
     setIsGlobalIncome(false);
@@ -202,6 +205,10 @@ export const AddTransactionScreen: React.FC = () => {
           type: transactionType,
           amount,
           category_id: parseInt(formData.categoryId),
+          ...(transactionType === "expense" &&
+            formData.expenseTypeId && {
+              expense_type_id: parseInt(formData.expenseTypeId),
+            }),
           note:
             formData.note ||
             (transactionType === "income" ? "Pemasukan" : "Pengeluaran"),
@@ -519,6 +526,45 @@ export const AddTransactionScreen: React.FC = () => {
               </View>
             )}
 
+            {/* Pilihan jenis pengeluaran - hanya untuk expense */}
+            {transactionType === "expense" && (
+              <View style={styles.categorySection}>
+                <Text style={styles.categoryLabel}>Jenis Pengeluaran:</Text>
+                <RadioButton.Group
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, expenseTypeId: value })
+                  }
+                  value={formData.expenseTypeId}
+                >
+                  <View style={styles.categoryItem}>
+                    <RadioButton value="" />
+                    <View style={styles.categoryInfo}>
+                      <Text style={styles.categoryName}>Tidak Ditentukan</Text>
+                      <Text style={styles.categoryBalance}>
+                        Lewati jenis pengeluaran
+                      </Text>
+                    </View>
+                  </View>
+                  {expenseTypes.map((expenseType) => (
+                    <View key={expenseType.id} style={styles.categoryItem}>
+                      <RadioButton value={expenseType.id!.toString()} />
+                      <View style={styles.categoryInfo}>
+                        <Text style={styles.categoryName}>
+                          {expenseType.name}
+                        </Text>
+                        <View
+                          style={[
+                            styles.colorIndicator,
+                            { backgroundColor: expenseType.color || "#6200EE" },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  ))}
+                </RadioButton.Group>
+              </View>
+            )}
+
             <TextInput
               label="Catatan (Opsional)"
               value={formData.note}
@@ -786,5 +832,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
+  },
+  colorIndicator: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
   },
 });

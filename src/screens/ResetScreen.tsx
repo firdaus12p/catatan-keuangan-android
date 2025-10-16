@@ -11,18 +11,11 @@ import {
   Portal,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useApp } from "../context/AppContext";
 
 export const ResetScreen: React.FC = () => {
   const router = useRouter();
-  const {
-    resetAllData,
-    resetTransactions,
-    resetLoans,
-    resetCategories,
-    resetCategoryBalances,
-    loading,
-  } = useApp();
+  // Temporary: Remove reset functionality for now since database doesn't support it
+  const loading = false;
 
   const [selectedOptions, setSelectedOptions] = useState({
     transactions: false,
@@ -61,6 +54,13 @@ export const ResetScreen: React.FC = () => {
     try {
       setConfirmDialogVisible(false);
 
+      // TODO: Implement reset functionality with new database structure
+      Alert.alert(
+        "Info",
+        "Reset functionality not yet implemented with new database structure"
+      );
+
+      /*
       if (resetType === "all") {
         await resetAllData();
         Alert.alert("Berhasil", "Semua data telah direset");
@@ -80,6 +80,7 @@ export const ResetScreen: React.FC = () => {
         }
         Alert.alert("Berhasil", "Data yang dipilih telah direset");
       }
+      */
 
       // Reset selection setelah berhasil
       setSelectedOptions({

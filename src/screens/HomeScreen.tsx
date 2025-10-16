@@ -14,7 +14,7 @@ import {
 import { BarChart, PieChart } from "react-native-chart-kit";
 import { Appbar, Card, Chip } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useApp } from "../context/AppContext";
+import { useAppContext } from "../context/AppContext";
 import { colors } from "../styles/commonStyles";
 import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
 import { formatCurrency } from "../utils/formatCurrency";
@@ -26,10 +26,12 @@ export const HomeScreen: React.FC = () => {
   const {
     categories,
     monthlyStats,
+    expenseTypes,
     loadCategories,
     loadMonthlyStats,
+    getExpenseStatsByType,
     initializeApp,
-  } = useApp();
+  } = useAppContext();
 
   const [selectedPeriod, setSelectedPeriod] = useState<"current" | "previous">(
     "current"
@@ -37,6 +39,50 @@ export const HomeScreen: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [showCategorySelector, setShowCategorySelector] = useState(false);
+  const [expenseStats, setExpenseStats] = useState<
+    {
+      expense_type_id: number | null;
+      expense_type_name: string | null;
+      color: string | null;
+      total_amount: number;
+    }[]
+  >([]);
+
+  // Function untuk load expense stats berdasarkan periode
+  const loadExpenseStats = useCallback(async () => {
+    try {
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+
+      let startDate: string;
+      let endDate: string;
+
+      if (selectedPeriod === "current") {
+        startDate = `${currentYear}-${currentMonth
+          .toString()
+          .padStart(2, "0")}-01`;
+        const lastDay = new Date(currentYear, currentMonth, 0).getDate();
+        endDate = `${currentYear}-${currentMonth
+          .toString()
+          .padStart(2, "0")}-${lastDay}`;
+      } else {
+        const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+        const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+        startDate = `${prevYear}-${prevMonth.toString().padStart(2, "0")}-01`;
+        const lastDay = new Date(prevYear, prevMonth, 0).getDate();
+        endDate = `${prevYear}-${prevMonth
+          .toString()
+          .padStart(2, "0")}-${lastDay}`;
+      }
+
+      const stats = await getExpenseStatsByType(startDate, endDate);
+      setExpenseStats(stats);
+    } catch (error) {
+      console.error("Error loading expense stats:", error);
+      setExpenseStats([]);
+    }
+  }, [selectedPeriod, getExpenseStatsByType]);
 
   // Initialize app dan load data
   useFocusEffect(
@@ -47,24 +93,13 @@ export const HomeScreen: React.FC = () => {
           setIsInitialized(true);
         } else {
           await loadCategories();
-
-          // Load stats berdasarkan periode yang dipilih
-          const now = new Date();
-          const currentMonth = now.getMonth() + 1;
-          const currentYear = now.getFullYear();
-
-          if (selectedPeriod === "current") {
-            await loadMonthlyStats(currentYear, currentMonth);
-          } else {
-            const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-            const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-            await loadMonthlyStats(prevYear, prevMonth);
-          }
+          // Load expense stats
+          await loadExpenseStats();
         }
       };
 
       initApp();
-    }, [selectedPeriod, isInitialized])
+    }, [isInitialized, loadExpenseStats])
   );
 
   // Auto-select top 2 categories with highest balance as default
@@ -127,18 +162,8 @@ export const HomeScreen: React.FC = () => {
 
   const handlePeriodChange = async (period: "current" | "previous") => {
     setSelectedPeriod(period);
-
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-
-    if (period === "current") {
-      await loadMonthlyStats(currentYear, currentMonth);
-    } else {
-      const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-      const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-      await loadMonthlyStats(prevYear, prevMonth);
-    }
+    // Monthly stats akan dimuat hanya ketika user secara manual memilih periode
+    // Tidak otomatis reload untuk mencegah infinite loop
   };
 
   // Data untuk chart
@@ -511,6 +536,53 @@ export const HomeScreen: React.FC = () => {
                 <MaterialIcons name="pie-chart" size={48} color="#CCCCCC" />
                 <Text style={styles.emptyChartText}>
                   Data keuangan belum ada
+                </Text>
+              </View>
+            )}
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Expense Types Chart */}
+      <Card style={styles.chartCard} elevation={2}>
+        <Card.Content>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              Distribusi Jenis Pengeluaran
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/expense-types" as any)}
+              style={styles.settingsButton}
+            >
+              <MaterialIcons name="settings" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.chartContainer}>
+            {expenseStats.length > 0 ? (
+              <PieChart
+                data={expenseStats.map((stat, index) => ({
+                  name: stat.expense_type_name || "Tidak Ditentukan",
+                  population: stat.total_amount,
+                  color: stat.color || "#C0C0C0",
+                  legendFontColor: "#7F7F7F",
+                  legendFontSize: 12,
+                }))}
+                width={screenWidth - 10}
+                height={200}
+                chartConfig={chartConfig}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="5"
+                center={[20, 0]}
+                style={styles.chart}
+              />
+            ) : (
+              <View style={styles.emptyChartContainer}>
+                <MaterialIcons name="donut-large" size={48} color="#CCCCCC" />
+                <Text style={styles.emptyChartText}>
+                  {selectedPeriod === "current"
+                    ? "Belum ada pengeluaran bulan ini"
+                    : "Belum ada pengeluaran bulan lalu"}
                 </Text>
               </View>
             )}

@@ -14,7 +14,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CategoryCard } from "../components/CategoryCard";
-import { useApp } from "../context/AppContext";
+import { useAppContext } from "../context/AppContext";
 import { Category } from "../db/database";
 import { colors } from "../styles/commonStyles";
 import { formatCurrency } from "../utils/formatCurrency";
@@ -26,7 +26,8 @@ export const CategoryScreen: React.FC = () => {
     addCategory,
     updateCategory,
     deleteCategory,
-  } = useApp();
+    forceDeleteCategory,
+  } = useAppContext();
 
   const { action } = useLocalSearchParams<{ action?: string }>();
   const router = useRouter();
@@ -142,8 +143,46 @@ export const CategoryScreen: React.FC = () => {
       await deleteCategory(id);
       Alert.alert("Sukses", "Kategori berhasil dihapus");
     } catch (error) {
-      Alert.alert("Error", "Gagal menghapus kategori");
-      console.error("Error deleting category:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
+      // Check if it's a foreign key constraint error
+      if (
+        errorMessage.includes("transaction(s) are using this category") ||
+        errorMessage.includes("loan(s) are using this category")
+      ) {
+        // Show confirmation dialog for force delete
+        Alert.alert(
+          "Kategori Masih Digunakan",
+          errorMessage +
+            "\n\nApakah Anda ingin menghapus kategori beserta semua transaksi dan pinjaman yang terkait?",
+          [
+            {
+              text: "Batal",
+              style: "cancel",
+            },
+            {
+              text: "Hapus Semua",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  await forceDeleteCategory(id);
+                  Alert.alert(
+                    "Sukses",
+                    "Kategori dan semua data terkait berhasil dihapus"
+                  );
+                } catch (forceError) {
+                  Alert.alert("Error", "Gagal menghapus kategori secara paksa");
+                  console.error("Error force deleting category:", forceError);
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Error", "Gagal menghapus kategori: " + errorMessage);
+        console.error("Error deleting category:", error);
+      }
     }
   };
 

@@ -1,23 +1,67 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { StyleSheet } from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { Alert, StyleSheet } from "react-native";
 import { FAB, Portal } from "react-native-paper";
+import { useApp } from "../context/AppContext";
 import { colors } from "../styles/commonStyles";
 
 export const FloatingActionButtons: React.FC = React.memo(() => {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const { categories } = useApp();
+
+  // Hitung total persentase alokasi dari semua kategori
+  const totalAllocationPercentage = useMemo(() => {
+    return categories.reduce((sum, cat) => sum + cat.percentage, 0);
+  }, [categories]);
+
+  // Validasi total alokasi sebelum membuka halaman transaksi
+  const validateAllocation = useCallback(() => {
+    if (totalAllocationPercentage < 100) {
+      Alert.alert(
+        "Alokasi Belum Lengkap",
+        `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
+          1
+        )}%.\n\nAnda perlu melengkapi alokasi hingga 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
+        [
+          {
+            text: "OK",
+            style: "default",
+          },
+          {
+            text: "Ke Halaman Kategori",
+            onPress: () => {
+              setOpen(false);
+              router.push("/(tabs)/category");
+            },
+          },
+        ]
+      );
+      return false;
+    }
+    return true;
+  }, [totalAllocationPercentage, router]);
 
   const onStateChange = ({ open }: { open: boolean }) => setOpen(open);
 
   const handlePemasukanPress = () => {
+    if (!validateAllocation()) {
+      setOpen(false);
+      return;
+    }
+
     setOpen(false);
     // Navigate ke transaction tab dengan parameter untuk pemasukan
     router.push("/(tabs)/transaction?action=income");
   };
 
   const handlePengeluaranPress = () => {
+    if (!validateAllocation()) {
+      setOpen(false);
+      return;
+    }
+
     setOpen(false);
     // Navigate ke transaction tab dengan parameter untuk pengeluaran
     router.push("/(tabs)/transaction?action=expense");

@@ -3,6 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
+  Alert,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -78,6 +79,49 @@ export const HomeScreen: React.FC = () => {
         setSelectedCategoryIds(topCategories);
       }
     }, [categories])
+  );
+
+  // Hitung total persentase alokasi dari semua kategori
+  const totalAllocationPercentage = useMemo(() => {
+    return categories.reduce((sum, cat) => sum + cat.percentage, 0);
+  }, [categories]);
+
+  // Validasi total alokasi sebelum membuka halaman transaksi
+  const validateAllocation = useCallback(() => {
+    if (totalAllocationPercentage < 100) {
+      Alert.alert(
+        "Alokasi Belum Lengkap",
+        `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
+          1
+        )}%.\n\nAnda perlu melengkapi alokasi hingga 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
+        [
+          {
+            text: "OK",
+            style: "default",
+          },
+          {
+            text: "Ke Halaman Kategori",
+            onPress: () => router.push({ pathname: "/(tabs)/category" } as any),
+          },
+        ]
+      );
+      return false;
+    }
+    return true;
+  }, [totalAllocationPercentage, router]);
+
+  const handleTransactionNavigation = useCallback(
+    (type: "income" | "expense") => {
+      if (!validateAllocation()) {
+        return;
+      }
+
+      router.push({
+        pathname: "/(tabs)/transaction",
+        params: { action: type },
+      } as any);
+    },
+    [validateAllocation, router]
   );
 
   const handlePeriodChange = async (period: "current" | "previous") => {
@@ -192,9 +236,7 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.quickActionsGrid}>
           <TouchableOpacity
             style={[styles.quickActionItem, { backgroundColor: "#E8F5E8" }]}
-            onPress={() =>
-              router.push({ pathname: "/(tabs)/transaction" } as any)
-            }
+            onPress={() => handleTransactionNavigation("income")}
           >
             <MaterialIcons name="trending-up" size={32} color="#4CAF50" />
             <Text style={styles.quickActionText}>Tambah{"\n"}Pemasukan</Text>
@@ -202,9 +244,7 @@ export const HomeScreen: React.FC = () => {
 
           <TouchableOpacity
             style={[styles.quickActionItem, { backgroundColor: "#FFEBEE" }]}
-            onPress={() =>
-              router.push({ pathname: "/(tabs)/transaction" } as any)
-            }
+            onPress={() => handleTransactionNavigation("expense")}
           >
             <MaterialIcons name="trending-down" size={32} color="#F44336" />
             <Text style={styles.quickActionText}>Tambah{"\n"}Pengeluaran</Text>

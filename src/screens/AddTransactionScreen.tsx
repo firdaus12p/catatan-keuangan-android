@@ -86,6 +86,35 @@ export const AddTransactionScreen: React.FC = () => {
     }, [])
   );
 
+  // Hitung total persentase alokasi dari semua kategori
+  const totalAllocationPercentage = useMemo(() => {
+    return categories.reduce((sum, cat) => sum + cat.percentage, 0);
+  }, [categories]);
+
+  // Validasi total alokasi sebelum membuka modal
+  const validateAllocation = useCallback(() => {
+    if (totalAllocationPercentage < 100) {
+      Alert.alert(
+        "Alokasi Belum Lengkap",
+        `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
+          1
+        )}%.\n\nAnda perlu melengkapi alokasi hingga 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
+        [
+          {
+            text: "OK",
+            style: "default",
+          },
+          {
+            text: "Ke Halaman Kategori",
+            onPress: () => router.push("/(tabs)/category"),
+          },
+        ]
+      );
+      return false;
+    }
+    return true;
+  }, [totalAllocationPercentage, router]);
+
   const resetForm = useCallback(() => {
     setFormData({
       amount: "",
@@ -98,6 +127,11 @@ export const AddTransactionScreen: React.FC = () => {
 
   const openModal = useCallback(
     (type: "income" | "expense") => {
+      // Validasi alokasi sebelum membuka modal
+      if (!validateAllocation()) {
+        return;
+      }
+
       resetForm();
       setTransactionType(type);
       if (type === "income") {
@@ -156,6 +190,11 @@ export const AddTransactionScreen: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!validateForm()) return;
 
+    // Validasi alokasi sebelum menyimpan transaksi
+    if (!validateAllocation()) {
+      return;
+    }
+
     try {
       const amount = parseNumberInput(formData.amount);
 
@@ -185,6 +224,7 @@ export const AddTransactionScreen: React.FC = () => {
     }
   }, [
     validateForm,
+    validateAllocation,
     formData,
     transactionType,
     isGlobalIncome,

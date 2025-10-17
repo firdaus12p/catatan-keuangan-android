@@ -110,10 +110,7 @@ const LoanItemComponent: React.FC<LoanItemProps> = ({
   const handleConfirmPartialPayment = () => {
     const amount = parseNumberInput(repaymentAmount);
     if (amount <= 0 || amount > loan.amount) {
-      Alert.alert(
-        "Maaf",
-        "Jumlah pembayaran yang anda masukkan tidak sesuai dengan jumlah pinjaman"
-      );
+      Alert.alert("Maaf", "Jumlah pembayaran yang anda masukkan tidak sesuai dengan jumlah pinjaman");
       return;
     }
 
@@ -362,9 +359,9 @@ export const LoanScreen: React.FC = () => {
     if (selectedCategory && selectedCategory.balance < amount) {
       Alert.alert(
         "Maaf",
-        `Saldo kategori "${selectedCategory.name}" hanya ${formatCurrency(
-          selectedCategory.balance
-        )} silahkan pilih kategori lain`
+        `Saldo kategori "${
+          selectedCategory.name
+        }" hanya ${formatCurrency(selectedCategory.balance)} silahkan pilih kategori lain`
       );
       return false;
     }
@@ -588,10 +585,9 @@ export const LoanScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
         <Appbar.Content
-          title="🤝 Kelola Pinjaman"
+          title="Kelola Pinjaman"
           titleStyle={styles.headerTitle}
         />
-      </Appbar.Header>
 
       <FlatList
         data={filteredLoans}

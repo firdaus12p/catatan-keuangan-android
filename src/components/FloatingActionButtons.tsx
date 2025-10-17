@@ -1,6 +1,12 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { Alert, StyleSheet } from "react-native";
 import { FAB, Portal } from "react-native-paper";
 import { useApp } from "../context/AppContext";
@@ -12,8 +18,16 @@ import {
 
 export const FloatingActionButtons: React.FC = React.memo(() => {
   const [open, setOpen] = useState(false);
+  const [isNavigating, startTransition] = useTransition();
   const router = useRouter();
   const { categories } = useApp();
+  const hasCategories = categories.length > 0;
+
+  useEffect(() => {
+    router.prefetch({ pathname: "/(tabs)/transaction" });
+    router.prefetch({ pathname: "/(tabs)/category" });
+    router.prefetch({ pathname: "/(tabs)/loan" });
+  }, [router]);
 
   // Hitung total persentase alokasi dari semua kategori
   const totalAllocationPercentage = useMemo(() => {
@@ -22,6 +36,10 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
 
   // Validasi total alokasi sebelum membuka halaman transaksi
   const validateAllocation = useCallback(() => {
+    if (!hasCategories) {
+      return true;
+    }
+
     if (!isAllocationComplete(totalAllocationPercentage)) {
       const deficit = getAllocationDeficit(totalAllocationPercentage);
       Alert.alert(
@@ -40,7 +58,7 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
             text: "Ke Halaman Kategori",
             onPress: () => {
               setOpen(false);
-              router.push("/(tabs)/category");
+              router.push({ pathname: "/(tabs)/category" });
             },
           },
         ]
@@ -48,43 +66,123 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
       return false;
     }
     return true;
-  }, [router, totalAllocationPercentage]);
+  }, [hasCategories, router, totalAllocationPercentage]);
 
-  const onStateChange = ({ open }: { open: boolean }) => setOpen(open);
+  const onStateChange = useCallback(({ open }: { open: boolean }) => {
+    setOpen(open);
+  }, []);
 
-  const handlePemasukanPress = () => {
+  type TargetRoute =
+    | { pathname: "/(tabs)/transaction"; params?: Record<string, string> }
+    | { pathname: "/(tabs)/category"; params?: Record<string, string> }
+    | { pathname: "/(tabs)/loan"; params?: Record<string, string> };
+
+  const navigate = useCallback((target: TargetRoute) => {
+      startTransition(() => {
+        router.push(target);
+      });
+    },
+    [router]
+  );
+
+  const handlePemasukanPress = useCallback(() => {
     if (!validateAllocation()) {
       setOpen(false);
       return;
     }
 
     setOpen(false);
-    // Navigate ke transaction tab dengan parameter untuk pemasukan
-    router.push("/(tabs)/transaction?action=income");
-  };
+    navigate({
+      pathname: "/(tabs)/transaction",
+      params: { action: "income" },
+    });
+  }, [navigate, validateAllocation]);
 
-  const handlePengeluaranPress = () => {
+  const handlePengeluaranPress = useCallback(() => {
     if (!validateAllocation()) {
       setOpen(false);
       return;
     }
 
     setOpen(false);
-    // Navigate ke transaction tab dengan parameter untuk pengeluaran
-    router.push("/(tabs)/transaction?action=expense");
-  };
+    navigate({
+      pathname: "/(tabs)/transaction",
+      params: { action: "expense" },
+    });
+  }, [navigate, validateAllocation]);
 
-  const handlePinjamanPress = () => {
+  const handlePinjamanPress = useCallback(() => {
     setOpen(false);
-    // Navigate ke loan tab dengan aksi tambah pinjaman
-    router.push("/(tabs)/loan?action=add");
-  };
+    navigate({
+      pathname: "/(tabs)/loan",
+      params: { action: "add" },
+    });
+  }, [navigate]);
 
-  const handleKategoriPress = () => {
+  const handleKategoriPress = useCallback(() => {
     setOpen(false);
-    // Navigate ke category tab dengan aksi tambah kategori
-    router.push("/(tabs)/category?action=add");
-  };
+    navigate({
+      pathname: "/(tabs)/category",
+      params: { action: "add" },
+    });
+  }, [navigate]);
+
+  const actions = useMemo(
+    () => [
+      {
+        icon: () => (
+          <MaterialIcons name="trending-up" size={24} color="#FFFFFF" />
+        ),
+        label: "Pemasukan",
+        onPress: handlePemasukanPress,
+        style: { backgroundColor: colors.income },
+        labelTextColor: colors.income,
+        size: "medium" as const,
+        disabled: isNavigating || !hasCategories,
+      },
+      {
+        icon: () => (
+          <MaterialIcons name="trending-down" size={24} color="#FFFFFF" />
+        ),
+        label: "Pengeluaran",
+        onPress: handlePengeluaranPress,
+        style: { backgroundColor: colors.expense },
+        labelTextColor: colors.expense,
+        size: "medium" as const,
+        disabled: isNavigating || !hasCategories,
+      },
+      {
+        icon: () => (
+          <MaterialIcons name="handshake" size={24} color="#FFFFFF" />
+        ),
+        label: "Tambah Pinjaman",
+        onPress: handlePinjamanPress,
+        style: { backgroundColor: colors.loan },
+        labelTextColor: colors.loan,
+        size: "medium" as const,
+        disabled: isNavigating || !hasCategories,
+      },
+      {
+        icon: () => (
+          <MaterialIcons name="category" size={24} color="#FFFFFF" />
+        ),
+        label: "Tambah Kategori",
+        onPress: handleKategoriPress,
+        style: { backgroundColor: colors.category },
+        labelTextColor: colors.category,
+        size: "medium" as const,
+        disabled: isNavigating || !hasCategories,
+      },
+    ],
+    [
+      handleKategoriPress,
+      handlePengeluaranPress,
+      handlePemasukanPress,
+      handlePinjamanPress,
+      hasCategories,
+      isNavigating,
+    ]
+  );
 
   return (
     <Portal>
@@ -92,48 +190,7 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
         open={open}
         visible={true}
         icon={open ? "close" : "plus"}
-        actions={[
-          {
-            icon: () => (
-              <MaterialIcons name="trending-up" size={24} color="#FFFFFF" />
-            ),
-            label: "Pemasukan",
-            onPress: handlePemasukanPress,
-            style: { backgroundColor: colors.income }, // Green - matching transaction tab
-            labelTextColor: colors.income,
-            size: "medium",
-          },
-          {
-            icon: () => (
-              <MaterialIcons name="trending-down" size={24} color="#FFFFFF" />
-            ),
-            label: "Pengeluaran",
-            onPress: handlePengeluaranPress,
-            style: { backgroundColor: colors.expense }, // Red - expense color
-            labelTextColor: colors.expense,
-            size: "medium",
-          },
-          {
-            icon: () => (
-              <MaterialIcons name="handshake" size={24} color="#FFFFFF" />
-            ),
-            label: "Tambah Pinjaman",
-            onPress: handlePinjamanPress,
-            style: { backgroundColor: colors.loan }, // Orange - matching loan tab
-            labelTextColor: colors.loan,
-            size: "medium",
-          },
-          {
-            icon: () => (
-              <MaterialIcons name="category" size={24} color="#FFFFFF" />
-            ),
-            label: "Tambah Kategori",
-            onPress: handleKategoriPress,
-            style: { backgroundColor: colors.category }, // Purple - matching category tab
-            labelTextColor: colors.category,
-            size: "medium",
-          },
-        ]}
+        actions={actions}
         onStateChange={onStateChange}
         onPress={() => {
           if (open) {

@@ -1,32 +1,84 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Dimensions,
+  InteractionManager,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { InteractionManager } from "react-native";
 import { BarChart, PieChart } from "react-native-chart-kit";
 import { Appbar, Card, Chip, ProgressBar } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useApp } from "../context/AppContext";
 import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
+import { useApp } from "../context/AppContext";
 import { ExpenseType } from "../db/database";
 import { colors } from "../styles/commonStyles";
-import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
-import { formatCurrency } from "../utils/formatCurrency";
 import {
   getAllocationDeficit,
   isAllocationComplete,
 } from "../utils/allocation";
+import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
+import { formatCurrency } from "../utils/formatCurrency";
 
 const screenWidth = Dimensions.get("window").width;
+
+// Hook untuk animasi count-up
+const useCountUp = (targetValue: number, duration: number = 1000) => {
+  const [currentValue, setCurrentValue] = useState(0);
+  const startTimeRef = useRef<number | null>(null);
+  const animationRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (targetValue === 0) {
+      setCurrentValue(0);
+      return;
+    }
+
+    const animate = (currentTime: number) => {
+      if (startTimeRef.current === null) {
+        startTimeRef.current = currentTime;
+      }
+
+      const elapsed = currentTime - startTimeRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Easing function untuk animasi yang lebih smooth
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+
+      setCurrentValue(targetValue * easedProgress);
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        setCurrentValue(targetValue);
+        startTimeRef.current = null;
+      }
+    };
+
+    startTimeRef.current = null;
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [targetValue, duration]);
+
+  return Math.round(currentValue);
+};
 
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
@@ -55,6 +107,46 @@ export const HomeScreen: React.FC = () => {
   const [expenseTypeBreakdown, setExpenseTypeBreakdown] = useState<
     ExpenseType[]
   >([]);
+
+  // Hook untuk animasi count-up Saldo Bersih
+  const animatedSaldoBersih = useCountUp(monthlyStats.saldoBersih, 1500);
+
+  // Hook untuk animasi count-up saldo kategori (fixed amount untuk menghindari hook rules violation)
+  const selectedCategories = useMemo(() => {
+    return categories.filter(
+      (cat) => cat.id && selectedCategoryIds.includes(cat.id)
+    );
+  }, [categories, selectedCategoryIds]);
+
+  // Pre-define hooks untuk maksimal 2 kategori (sesuai design app)
+  const category1Balance = selectedCategories[0]?.balance || 0;
+  const category2Balance = selectedCategories[1]?.balance || 0;
+
+  const animatedCategory1Balance = useCountUp(category1Balance, 1200);
+  const animatedCategory2Balance = useCountUp(category2Balance, 1200);
+
+  // Hook untuk animasi Total Gabungan kategori
+  const totalCombinedBalance = useMemo(() => {
+    return selectedCategories.reduce((sum, cat) => sum + cat.balance, 0);
+  }, [selectedCategories]);
+
+  const animatedTotalCombined = useCountUp(totalCombinedBalance, 1300);
+
+  // Helper function untuk mendapatkan nilai animasi berdasarkan index
+  const getAnimatedCategoryBalance = useCallback(
+    (index: number) => {
+      if (index === 0) return animatedCategory1Balance;
+      if (index === 1) return animatedCategory2Balance;
+      return 0;
+    },
+    [animatedCategory1Balance, animatedCategory2Balance]
+  );
+
+  useEffect(() => {
+    router.prefetch("/(tabs)/transaction");
+    router.prefetch("/(tabs)/category");
+    router.prefetch("/(tabs)/loan");
+  }, [router]);
 
   const resolvePeriodDate = useCallback((period: "current" | "previous") => {
     const now = new Date();
@@ -138,6 +230,7 @@ export const HomeScreen: React.FC = () => {
   );
 
   // Hitung total persentase alokasi dari semua kategori
+  const hasCategories = categories.length > 0;
   const totalAllocationPercentage = useMemo(() => {
     return categories.reduce((sum, cat) => sum + cat.percentage, 0);
   }, [categories]);
@@ -161,6 +254,10 @@ export const HomeScreen: React.FC = () => {
 
   // Validasi total alokasi sebelum membuka halaman transaksi
   const validateAllocation = useCallback(() => {
+    if (!hasCategories) {
+      return true;
+    }
+
     if (!isAllocationComplete(totalAllocationPercentage)) {
       const deficit = getAllocationDeficit(totalAllocationPercentage);
       Alert.alert(
@@ -184,10 +281,12 @@ export const HomeScreen: React.FC = () => {
       return false;
     }
     return true;
-  }, [router, totalAllocationPercentage]);
+  }, [hasCategories, router, totalAllocationPercentage]);
 
   const openExpenseTypeManager = useCallback(() => {
-    setExpenseTypeManagerVisible(true);
+    InteractionManager.runAfterInteractions(() => {
+      setExpenseTypeManagerVisible(true);
+    });
   }, []);
 
   const closeExpenseTypeManager = useCallback(() => {
@@ -338,7 +437,11 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.quickActionsGrid}>
           <TouchableOpacity
             style={[styles.quickActionItem, { backgroundColor: "#E8F5E8" }]}
-            onPress={() => handleTransactionNavigation("income")}
+            onPress={() => {
+              InteractionManager.runAfterInteractions(() => {
+                handleTransactionNavigation("income");
+              });
+            }}
           >
             <MaterialIcons name="trending-up" size={32} color="#4CAF50" />
             <Text style={styles.quickActionText}>Tambah{"\n"}Pemasukan</Text>
@@ -346,7 +449,11 @@ export const HomeScreen: React.FC = () => {
 
           <TouchableOpacity
             style={[styles.quickActionItem, { backgroundColor: "#FFEBEE" }]}
-            onPress={() => handleTransactionNavigation("expense")}
+            onPress={() => {
+              InteractionManager.runAfterInteractions(() => {
+                handleTransactionNavigation("expense");
+              });
+            }}
           >
             <MaterialIcons name="trending-down" size={32} color="#F44336" />
             <Text style={styles.quickActionText}>Tambah{"\n"}Pengeluaran</Text>
@@ -354,7 +461,11 @@ export const HomeScreen: React.FC = () => {
 
           <TouchableOpacity
             style={[styles.quickActionItem, { backgroundColor: "#E3F2FD" }]}
-            onPress={() => router.push({ pathname: "/(tabs)/category" } as any)}
+            onPress={() => {
+              InteractionManager.runAfterInteractions(() => {
+                router.push({ pathname: "/(tabs)/category" } as any);
+              });
+            }}
           >
             <MaterialIcons name="category" size={32} color="#2196F3" />
             <Text style={styles.quickActionText}>Kelola{"\n"}Kategori</Text>
@@ -362,7 +473,11 @@ export const HomeScreen: React.FC = () => {
 
           <TouchableOpacity
             style={[styles.quickActionItem, { backgroundColor: "#FFF3E0" }]}
-            onPress={() => router.push({ pathname: "/(tabs)/loan" } as any)}
+            onPress={() => {
+              InteractionManager.runAfterInteractions(() => {
+                router.push({ pathname: "/(tabs)/loan" } as any);
+              });
+            }}
           >
             <MaterialIcons name="handshake" size={32} color="#FF9800" />
             <Text style={styles.quickActionText}>Kelola{"\n"}Pinjaman</Text>
@@ -370,7 +485,11 @@ export const HomeScreen: React.FC = () => {
 
           <TouchableOpacity
             style={[styles.quickActionItem, { backgroundColor: "#FFEBEE" }]}
-            onPress={() => router.push("/reset" as any)}
+            onPress={() => {
+              InteractionManager.runAfterInteractions(() => {
+                router.push("/reset" as any);
+              });
+            }}
           >
             <MaterialIcons name="refresh" size={32} color="#F44336" />
             <Text style={styles.quickActionText}>Reset{"\n"}Data</Text>
@@ -446,7 +565,7 @@ export const HomeScreen: React.FC = () => {
                 { color: saldoBersih >= 0 ? "#4CAF50" : "#F44336" },
               ]}
             >
-              {formatCurrency(saldoBersih)}
+              {formatCurrency(animatedSaldoBersih)}
             </Text>
           </View>
         </View>
@@ -463,7 +582,11 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Saldo Kategori</Text>
             <TouchableOpacity
-              onPress={() => setShowCategorySelector(!showCategorySelector)}
+              onPress={() => {
+                InteractionManager.runAfterInteractions(() => {
+                  setShowCategorySelector(!showCategorySelector);
+                });
+              }}
               style={styles.settingsButton}
             >
               <MaterialIcons
@@ -514,19 +637,14 @@ export const HomeScreen: React.FC = () => {
                   <MaterialIcons name="functions" size={24} color="#2196F3" />
                   <Text style={styles.totalCombinedLabel}>Total Gabungan</Text>
                   <Text style={styles.totalCombinedValue}>
-                    {formatCurrency(
-                      selectedCategories.reduce(
-                        (sum, cat) => sum + cat.balance,
-                        0
-                      )
-                    )}
+                    {formatCurrency(animatedTotalCombined)}
                   </Text>
                 </View>
               )}
 
               {/* Individual Categories */}
               <View style={styles.selectedCategoriesGrid}>
-                {selectedCategories.map((category) => (
+                {selectedCategories.map((category, index) => (
                   <View key={category.id} style={styles.categoryBalanceItem}>
                     <MaterialIcons
                       name="account-balance-wallet"
@@ -537,7 +655,7 @@ export const HomeScreen: React.FC = () => {
                       {category.name}
                     </Text>
                     <Text style={styles.categoryBalanceValue}>
-                      {formatCurrency(category.balance)}
+                      {formatCurrency(getAnimatedCategoryBalance(index))}
                     </Text>
                   </View>
                 ))}
@@ -630,11 +748,7 @@ export const HomeScreen: React.FC = () => {
               onPress={openExpenseTypeManager}
               style={styles.expenseHighlightSettings}
             >
-              <MaterialIcons
-                name="settings"
-                size={20}
-                color={colors.expense}
-              />
+              <MaterialIcons name="settings" size={20} color={colors.expense} />
             </TouchableOpacity>
           </View>
           {totalExpenseTypeSpent > 0 ? (
@@ -645,7 +759,9 @@ export const HomeScreen: React.FC = () => {
               {sortedExpenseTypes.map((type) => {
                 const amount = type.total_spent ?? 0;
                 const percentage =
-                  totalExpenseTypeSpent > 0 ? amount / totalExpenseTypeSpent : 0;
+                  totalExpenseTypeSpent > 0
+                    ? amount / totalExpenseTypeSpent
+                    : 0;
 
                 return (
                   <View key={type.id} style={styles.expenseListRow}>
@@ -676,8 +792,8 @@ export const HomeScreen: React.FC = () => {
                 Belum ada data pengeluaran
               </Text>
               <Text style={styles.expenseHighlightDescription}>
-                Tambahkan transaksi pengeluaran untuk melihat jenis
-                yang paling mendominasi.
+                Tambahkan transaksi pengeluaran untuk melihat jenis yang paling
+                mendominasi.
               </Text>
             </View>
           )}

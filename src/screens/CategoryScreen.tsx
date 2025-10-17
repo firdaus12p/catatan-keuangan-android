@@ -37,6 +37,11 @@ export const CategoryScreen: React.FC = () => {
   const { action } = useLocalSearchParams<{ action?: string }>();
   const router = useRouter();
 
+  useEffect(() => {
+    router.prefetch({ pathname: "/(tabs)/transaction" });
+    router.prefetch({ pathname: "/(tabs)/loan" });
+  }, [router]);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({

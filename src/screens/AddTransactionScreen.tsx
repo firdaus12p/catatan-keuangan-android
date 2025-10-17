@@ -130,12 +130,17 @@ export const AddTransactionScreen: React.FC = () => {
   }, [transactionType, formData.expenseTypeId]);
 
   // Hitung total persentase alokasi dari semua kategori
+  const hasCategories = categories.length > 0;
   const totalAllocationPercentage = useMemo(() => {
     return categories.reduce((sum, cat) => sum + cat.percentage, 0);
   }, [categories]);
 
   // Validasi total alokasi sebelum membuka modal
   const validateAllocation = useCallback(() => {
+    if (!hasCategories) {
+      return true;
+    }
+
     if (!isAllocationComplete(totalAllocationPercentage)) {
       const deficit = getAllocationDeficit(totalAllocationPercentage);
       Alert.alert(
@@ -159,7 +164,7 @@ export const AddTransactionScreen: React.FC = () => {
       return false;
     }
     return true;
-  }, [router, totalAllocationPercentage]);
+  }, [hasCategories, router, totalAllocationPercentage]);
 
   const resetForm = useCallback(() => {
     setFormData({

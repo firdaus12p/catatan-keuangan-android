@@ -255,7 +255,7 @@ export const NotificationScreen: React.FC = React.memo(() => {
       <SafeAreaView style={styles.container}>
         <Appbar.Header style={styles.header}>
           <Appbar.Content
-            title="Pengaturan Notifikasi"
+            title="🔔 Pengaturan Notifikasi"
             titleStyle={styles.headerTitle}
           />
         </Appbar.Header>
@@ -270,7 +270,7 @@ export const NotificationScreen: React.FC = React.memo(() => {
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
         <Appbar.Content
-          title="Pengaturan Notifikasi"
+          title="🔔 Pengaturan Notifikasi"
           titleStyle={styles.headerTitle}
         />
       </Appbar.Header>

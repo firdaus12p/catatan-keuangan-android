@@ -1,10 +1,11 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
+  InteractionManager,
   Modal as RNModal,
   ScrollView,
   StyleSheet,
@@ -46,7 +47,7 @@ interface LoanItemProps {
   onViewPayments: (loanId: number, loanName: string) => void;
 }
 
-const LoanItem: React.FC<LoanItemProps> = ({
+const LoanItemComponent: React.FC<LoanItemProps> = ({
   loan,
   categories,
   onUpdateStatus,
@@ -109,7 +110,7 @@ const LoanItem: React.FC<LoanItemProps> = ({
   const handleConfirmPartialPayment = () => {
     const amount = parseNumberInput(repaymentAmount);
     if (amount <= 0 || amount > loan.amount) {
-      Alert.alert("Error", "Jumlah pembayaran tidak valid");
+      Alert.alert("Maaf", "Jumlah pembayaran yang anda masukkan tidak sesuai dengan jumlah pinjaman");
       return;
     }
 
@@ -257,6 +258,8 @@ const LoanItem: React.FC<LoanItemProps> = ({
   );
 };
 
+const LoanItem = React.memo(LoanItemComponent);
+
 LoanItem.displayName = "LoanItem";
 
 export const LoanScreen: React.FC = () => {
@@ -299,22 +302,20 @@ export const LoanScreen: React.FC = () => {
   // Refresh data saat screen difokuskan
   useFocusEffect(
     React.useCallback(() => {
-      loadCategories();
-      loadLoans();
+      let isMounted = true;
+      const task = InteractionManager.runAfterInteractions(async () => {
+        if (!isMounted) return;
+        await Promise.all([loadCategories(), loadLoans()]);
+      });
 
-      // Cleanup function saat screen blur/unfocus
       return () => {
-        // LoanScreen blur - closing all menus for better UX
+        isMounted = false;
+        if (task && typeof task.cancel === "function") {
+          task.cancel();
+        }
       };
-    }, [])
+    }, [loadCategories, loadLoans])
   );
-
-  // Cleanup placeholder (dipertahankan untuk konsistensi hook)
-  useEffect(() => {
-    return () => {
-      // no specific teardown needed
-    };
-  }, []);
 
   const resetForm = () => {
     setFormData({
@@ -357,10 +358,10 @@ export const LoanScreen: React.FC = () => {
     );
     if (selectedCategory && selectedCategory.balance < amount) {
       Alert.alert(
-        "Error",
+        "Maaf",
         `Saldo kategori "${
           selectedCategory.name
-        }" tidak mencukupi.\nSaldo: ${formatCurrency(selectedCategory.balance)}`
+        }" hanya ${formatCurrency(selectedCategory.balance)} silahkan pilih kategori lain`
       );
       return false;
     }
@@ -444,85 +445,127 @@ export const LoanScreen: React.FC = () => {
   }, []);
 
   // Filter loans berdasarkan status
-  const filteredLoans =
-    filterStatus === "all"
-      ? loans
-      : loans.filter((loan) => loan.status === filterStatus);
+  const loanStats = useMemo(() => {
+    return loans.reduce(
+      (acc, loan) => {
+        acc.totalLoans += 1;
+        acc.totalAmount += loan.amount;
 
-  // Statistik pinjaman
-  const totalLoans = loans.length;
-  const unpaidLoans = loans.filter((loan) => loan.status === "unpaid").length;
-  const halfPaidLoans = loans.filter((loan) => loan.status === "half").length;
-  const paidLoans = loans.filter((loan) => loan.status === "paid").length;
-  const totalAmount = loans.reduce((sum, loan) => sum + loan.amount, 0);
-  const unpaidAmount = loans
-    .filter((loan) => loan.status === "unpaid" || loan.status === "half")
-    .reduce((sum, loan) => sum + loan.amount, 0);
+        if (loan.status === "unpaid") {
+          acc.unpaidLoans += 1;
+          acc.unpaidAmount += loan.amount;
+        } else if (loan.status === "half") {
+          acc.halfPaidLoans += 1;
+          acc.unpaidAmount += loan.amount;
+        } else if (loan.status === "paid") {
+          acc.paidLoans += 1;
+        }
 
-  const renderHeader = () => (
-    <View>
-      {/* Filter Status */}
-      <View style={styles.filterContainer}>
-        <Text style={styles.filterTitle}>Filter Status:</Text>
-        <View style={styles.filterChips}>
-          <Chip
-            selected={filterStatus === "all"}
-            onPress={() => setFilterStatus("all")}
-            style={styles.filterChip}
-          >
-            Semua ({totalLoans})
-          </Chip>
-          <Chip
-            selected={filterStatus === "unpaid"}
-            onPress={() => setFilterStatus("unpaid")}
-            style={styles.filterChip}
-          >
-            Belum Bayar ({unpaidLoans})
-          </Chip>
-          <Chip
-            selected={filterStatus === "half"}
-            onPress={() => setFilterStatus("half")}
-            style={styles.filterChip}
-          >
-            Sebagian ({halfPaidLoans})
-          </Chip>
-          <Chip
-            selected={filterStatus === "paid"}
-            onPress={() => setFilterStatus("paid")}
-            style={styles.filterChip}
-          >
-            Lunas ({paidLoans})
-          </Chip>
-        </View>
-      </View>
+        return acc;
+      },
+      {
+        totalLoans: 0,
+        unpaidLoans: 0,
+        halfPaidLoans: 0,
+        paidLoans: 0,
+        totalAmount: 0,
+        unpaidAmount: 0,
+      }
+    );
+  }, [loans]);
 
-      {/* Statistik */}
-      <Card style={styles.statsCard} elevation={2}>
-        <Card.Content>
-          <Text style={styles.statsTitle}>Ringkasan Pinjaman</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <MaterialIcons
-                name="account-balance-wallet"
-                size={24}
-                color="#2196F3"
-              />
-              <Text style={styles.statLabel}>Total Pinjaman</Text>
-              <Text style={styles.statValue}>
-                {formatCurrency(totalAmount)}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <MaterialIcons name="pending" size={24} color="#F44336" />
-              <Text style={styles.statLabel}>Belum Terbayar</Text>
-              <Text style={[styles.statValue, { color: "#F44336" }]}>
-                {formatCurrency(unpaidAmount)}
-              </Text>
-            </View>
+  const filteredLoans = useMemo(
+    () =>
+      filterStatus === "all"
+        ? loans
+        : loans.filter((loan) => loan.status === filterStatus),
+    [filterStatus, loans]
+  );
+
+  const {
+    totalLoans,
+    unpaidLoans,
+    halfPaidLoans,
+    paidLoans,
+    totalAmount,
+    unpaidAmount,
+  } = loanStats;
+
+  const headerComponent = useMemo(
+    () => (
+      <View>
+        {/* Filter Status */}
+        <View style={styles.filterContainer}>
+          <Text style={styles.filterTitle}>Filter Status:</Text>
+          <View style={styles.filterChips}>
+            <Chip
+              selected={filterStatus === "all"}
+              onPress={() => setFilterStatus("all")}
+              style={styles.filterChip}
+            >
+              Semua ({totalLoans})
+            </Chip>
+            <Chip
+              selected={filterStatus === "unpaid"}
+              onPress={() => setFilterStatus("unpaid")}
+              style={styles.filterChip}
+            >
+              Belum Bayar ({unpaidLoans})
+            </Chip>
+            <Chip
+              selected={filterStatus === "half"}
+              onPress={() => setFilterStatus("half")}
+              style={styles.filterChip}
+            >
+              Sebagian ({halfPaidLoans})
+            </Chip>
+            <Chip
+              selected={filterStatus === "paid"}
+              onPress={() => setFilterStatus("paid")}
+              style={styles.filterChip}
+            >
+              Lunas ({paidLoans})
+            </Chip>
           </View>
-        </Card.Content>
-      </Card>
-    </View>
+        </View>
+
+        {/* Statistik */}
+        <Card style={styles.statsCard} elevation={2}>
+          <Card.Content>
+            <Text style={styles.statsTitle}>Ringkasan Pinjaman</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <MaterialIcons
+                  name="account-balance-wallet"
+                  size={24}
+                  color="#2196F3"
+                />
+                <Text style={styles.statLabel}>Total Pinjaman</Text>
+                <Text style={styles.statValue}>
+                  {formatCurrency(totalAmount)}
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <MaterialIcons name="pending" size={24} color="#F44336" />
+                <Text style={styles.statLabel}>Belum Terbayar</Text>
+                <Text style={[styles.statValue, { color: "#F44336" }]}>
+                  {formatCurrency(unpaidAmount)}
+                </Text>
+              </View>
+            </View>
+          </Card.Content>
+        </Card>
+      </View>
+    ),
+    [
+      filterStatus,
+      halfPaidLoans,
+      paidLoans,
+      totalAmount,
+      totalLoans,
+      unpaidAmount,
+      unpaidLoans,
+    ]
   );
 
   const renderLoanItem = useCallback(
@@ -542,7 +585,7 @@ export const LoanScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
         <Appbar.Content
-          title="Kelola Pinjaman"
+          title="🤝 Kelola Pinjaman"
           titleStyle={styles.headerTitle}
         />
       </Appbar.Header>
@@ -551,7 +594,7 @@ export const LoanScreen: React.FC = () => {
         data={filteredLoans}
         renderItem={renderLoanItem}
         keyExtractor={(item) => item.id!.toString()}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={headerComponent}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={

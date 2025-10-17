@@ -342,6 +342,54 @@ class Database {
     }
   }
 
+  async transferCategoryBalance(
+    sourceCategoryId: number,
+    targetCategoryId: number,
+    amount: number
+  ): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    if (sourceCategoryId === targetCategoryId) {
+      throw new Error("Kategori sumber dan tujuan tidak boleh sama");
+    }
+    if (amount <= 0) {
+      throw new Error("Jumlah transfer harus lebih dari 0");
+    }
+
+    await this.db.withExclusiveTransactionAsync(async (txn) => {
+      const source = (await txn.getFirstAsync(
+        "SELECT balance FROM categories WHERE id = ?",
+        [sourceCategoryId]
+      )) as { balance: number } | undefined;
+
+      if (!source) {
+        throw new Error("Kategori sumber tidak ditemukan");
+      }
+
+      const targetExists = await txn.getFirstAsync(
+        "SELECT 1 FROM categories WHERE id = ?",
+        [targetCategoryId]
+      );
+
+      if (!targetExists) {
+        throw new Error("Kategori tujuan tidak ditemukan");
+      }
+
+      if (source.balance < amount) {
+        throw new Error("Saldo kategori sumber tidak mencukupi");
+      }
+
+      await txn.runAsync(
+        "UPDATE categories SET balance = balance - ? WHERE id = ?",
+        [amount, sourceCategoryId]
+      );
+
+      await txn.runAsync(
+        "UPDATE categories SET balance = balance + ? WHERE id = ?",
+        [amount, targetCategoryId]
+      );
+    });
+  }
+
   // CRUD untuk Expense Types
   async getExpenseTypes(): Promise<ExpenseType[]> {
     if (!this.db) throw new Error("Database not initialized");

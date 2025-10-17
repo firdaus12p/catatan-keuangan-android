@@ -2,7 +2,14 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
@@ -17,8 +24,8 @@ import {
   TextInput,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TransactionItem } from "../components/TransactionItem";
 import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
+import { TransactionItem } from "../components/TransactionItem";
 import { useApp } from "../context/AppContext";
 import { Transaction } from "../db/database";
 import { colors } from "../styles/commonStyles";
@@ -68,6 +75,7 @@ export const AddTransactionScreen: React.FC = () => {
   );
   const [expenseTypeManagerVisible, setExpenseTypeManagerVisible] =
     useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Handle floating action button actions
   useEffect(() => {
@@ -264,6 +272,9 @@ export const AddTransactionScreen: React.FC = () => {
   );
 
   const handleSave = useCallback(async () => {
+    if (saving) {
+      return;
+    }
     if (!validateForm()) return;
 
     // Validasi alokasi sebelum menyimpan transaksi
@@ -271,6 +282,7 @@ export const AddTransactionScreen: React.FC = () => {
       return;
     }
 
+    setSaving(true);
     try {
       const amount = parseNumberInput(formData.amount);
 
@@ -301,8 +313,11 @@ export const AddTransactionScreen: React.FC = () => {
     } catch (error) {
       Alert.alert("Error", "Gagal menambahkan transaksi");
       console.error("Error saving transaction:", error);
+    } finally {
+      setSaving(false);
     }
   }, [
+    saving,
     validateForm,
     validateAllocation,
     formData,
@@ -496,7 +511,7 @@ export const AddTransactionScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
-        <Appbar.Content title="Transaksi" titleStyle={styles.headerTitle} />
+        <Appbar.Content title="💰 Transaksi" titleStyle={styles.headerTitle} />
       </Appbar.Header>
 
       <FlatList
@@ -607,7 +622,9 @@ export const AddTransactionScreen: React.FC = () => {
             {transactionType === "expense" && !isGlobalIncome && (
               <View style={styles.expenseTypeSection}>
                 <View style={styles.expenseTypeHeader}>
-                  <Text style={styles.expenseTypeLabel}>Jenis Pengeluaran:</Text>
+                  <Text style={styles.expenseTypeLabel}>
+                    Jenis Pengeluaran:
+                  </Text>
                   <TouchableOpacity
                     onPress={openExpenseTypeManager}
                     style={styles.expenseTypeManageButton}
@@ -631,7 +648,9 @@ export const AddTransactionScreen: React.FC = () => {
                       <View key={type.id} style={styles.expenseTypeItem}>
                         <RadioButton value={type.id!.toString()} />
                         <View style={styles.expenseTypeInfo}>
-                          <Text style={styles.expenseTypeName}>{type.name}</Text>
+                          <Text style={styles.expenseTypeName}>
+                            {type.name}
+                          </Text>
                           <Text style={styles.expenseTypeSpent}>
                             Total: {formatCurrency(type.total_spent)}
                           </Text>
@@ -673,6 +692,7 @@ export const AddTransactionScreen: React.FC = () => {
                 mode="outlined"
                 onPress={closeModal}
                 style={styles.button}
+                disabled={saving}
               >
                 Batal
               </Button>
@@ -680,6 +700,8 @@ export const AddTransactionScreen: React.FC = () => {
                 mode="contained"
                 onPress={handleSave}
                 style={styles.button}
+                loading={saving}
+                disabled={saving}
               >
                 Simpan
               </Button>

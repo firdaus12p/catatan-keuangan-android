@@ -40,6 +40,11 @@ interface AppContextType {
   addCategory: (category: Omit<Category, "id">) => Promise<void>;
   updateCategory: (id: number, category: Omit<Category, "id">) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
+  transferCategoryBalance: (
+    sourceCategoryId: number,
+    targetCategoryId: number,
+    amount: number
+  ) => Promise<void>;
 
   // Expense Types
   expenseTypes: ExpenseType[];
@@ -177,6 +182,27 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     [loadCategories]
   );
 
+  const transferCategoryBalance = useCallback(
+    async (
+      sourceCategoryId: number,
+      targetCategoryId: number,
+      amount: number
+    ): Promise<void> => {
+      try {
+        await database.transferCategoryBalance(
+          sourceCategoryId,
+          targetCategoryId,
+          amount
+        );
+        await loadCategories();
+      } catch (error) {
+        console.error("Error transferring category balance:", error);
+        throw error;
+      }
+    },
+    [loadCategories]
+  );
+
   // Expense Types methods
   const loadExpenseTypes = useCallback(async (): Promise<void> => {
     try {
@@ -296,19 +322,22 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     async (transaction: Omit<Transaction, "id">): Promise<void> => {
       try {
         await database.addTransaction(transaction);
-        await loadTransactions(); // Refresh data
-        await loadCategories(); // Refresh categories untuk update saldo
-        await loadExpenseTypes(); // Refresh jenis pengeluaran
+        const refreshTasks: Promise<void>[] = [
+          loadTransactions(), // Refresh data
+          loadCategories(), // Refresh categories untuk update saldo
+          loadExpenseTypes(), // Refresh jenis pengeluaran
+        ];
 
-        // Refresh statistik jika transaksi bulan ini
         const transactionDate = new Date(transaction.date);
         const now = new Date();
         if (
           transactionDate.getMonth() === now.getMonth() &&
           transactionDate.getFullYear() === now.getFullYear()
         ) {
-          await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+          refreshTasks.push(loadMonthlyStats(now.getFullYear(), now.getMonth() + 1));
         }
+
+        await Promise.all(refreshTasks);
       } catch (error) {
         console.error("Error adding transaction:", error);
         throw error;
@@ -321,12 +350,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     async (amount: number, note: string = "Pemasukan Global"): Promise<void> => {
       try {
         await database.addGlobalIncome(amount, note);
-        await loadTransactions(); // Refresh data
-        await loadCategories(); // Refresh categories untuk update saldo
-
-        // Refresh statistik bulan ini
         const now = new Date();
-        await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+        await Promise.all([
+          loadTransactions(), // Refresh data
+          loadCategories(), // Refresh categories untuk update saldo
+          loadMonthlyStats(now.getFullYear(), now.getMonth() + 1), // Refresh statistik bulan ini
+        ]);
       } catch (error) {
         console.error("Error adding global income:", error);
         throw error;
@@ -512,6 +541,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       addCategory,
       updateCategory,
       deleteCategory,
+      transferCategoryBalance,
 
       // Expense Types
       expenseTypes,
@@ -571,8 +601,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       deleteCategory,
       deleteExpenseType,
       deleteLoan,
-      getExpenseTypeTotalsByMonth,
       expenseTypes,
+      getExpenseTypeTotalsByMonth,
       getLoanPayments,
       handleInitializeNotifications,
       initializeApp,
@@ -591,6 +621,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       resetLoans,
       resetTransactions,
       totalAllTimeBalance,
+      transferCategoryBalance,
       updateCategory,
       updateExpenseType,
       updateLoanStatus,

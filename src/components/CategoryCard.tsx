@@ -10,10 +10,11 @@ interface CategoryCardProps {
   category: Category;
   onEdit: (category: Category) => void;
   onDelete: (id: number) => void;
+  onTransfer: (category: Category) => void;
 }
 
 export const CategoryCard: React.FC<CategoryCardProps> = React.memo(
-  ({ category, onEdit, onDelete }) => {
+  ({ category, onEdit, onDelete, onTransfer }) => {
     const handleDelete = () => {
       Alert.alert(
         "Hapus Kategori",
@@ -60,6 +61,12 @@ export const CategoryCard: React.FC<CategoryCardProps> = React.memo(
                 size={20}
                 iconColor="#2196F3"
                 onPress={() => onEdit(category)}
+              />
+              <IconButton
+                icon="swap-horizontal"
+                size={20}
+                iconColor="#4CAF50"
+                onPress={() => onTransfer(category)}
               />
               <IconButton
                 icon="delete"

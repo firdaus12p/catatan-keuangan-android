@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { InteractionManager } from "react-native";
 import { BarChart, PieChart } from "react-native-chart-kit";
 import { Appbar, Card, Chip, ProgressBar } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -77,7 +78,10 @@ export const HomeScreen: React.FC = () => {
   // Initialize app dan load data
   useFocusEffect(
     React.useCallback(() => {
+      let cancelled = false;
+
       const initApp = async () => {
+        if (cancelled) return;
         if (!isInitialized) {
           await initializeApp();
           setIsInitialized(true);
@@ -92,7 +96,16 @@ export const HomeScreen: React.FC = () => {
         await refreshExpenseBreakdown(selectedPeriod);
       };
 
-      initApp();
+      const interaction = InteractionManager.runAfterInteractions(() => {
+        void initApp();
+      });
+
+      return () => {
+        cancelled = true;
+        if (interaction && typeof interaction.cancel === "function") {
+          interaction.cancel();
+        }
+      };
     }, [
       initializeApp,
       isInitialized,

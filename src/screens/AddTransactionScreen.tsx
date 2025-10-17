@@ -3,7 +3,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -29,6 +28,7 @@ import { TransactionItem } from "../components/TransactionItem";
 import { useApp } from "../context/AppContext";
 import { Transaction } from "../db/database";
 import { colors } from "../styles/commonStyles";
+import { showConfirm, showError, showSuccess } from "../utils/alertHelper";
 import {
   getAllocationDeficit,
   isAllocationComplete,
@@ -44,6 +44,11 @@ import {
   formatNumberInput,
   parseNumberInput,
 } from "../utils/formatCurrency";
+import {
+  validatePositiveAmount,
+  validateSelection,
+  validateSufficientBalance,
+} from "../utils/validationHelper";
 
 export const AddTransactionScreen: React.FC = () => {
   const {
@@ -143,23 +148,17 @@ export const AddTransactionScreen: React.FC = () => {
 
     if (!isAllocationComplete(totalAllocationPercentage)) {
       const deficit = getAllocationDeficit(totalAllocationPercentage);
-      Alert.alert(
+      showConfirm(
         "Alokasi Belum Lengkap",
         `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
           1
         )}%.\n\nTambahkan alokasi sebesar ${deficit.toFixed(
           1
         )}% lagi agar mencapai 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
-        [
-          {
-            text: "OK",
-            style: "default",
-          },
-          {
-            text: "Ke Halaman Kategori",
-            onPress: () => router.push("/(tabs)/category"),
-          },
-        ]
+        () => router.push("/(tabs)/category"),
+        undefined,
+        "Ke Halaman Kategori",
+        "OK"
       );
       return false;
     }
@@ -202,36 +201,36 @@ export const AddTransactionScreen: React.FC = () => {
   const validateForm = useCallback((): boolean => {
     const amount = parseNumberInput(formData.amount);
 
-    if (amount <= 0) {
-      Alert.alert("Error", "Jumlah harus lebih dari 0");
+    if (!validatePositiveAmount(amount)) {
       return false;
     }
 
-    if (!isGlobalIncome && !formData.categoryId) {
-      Alert.alert("Error", "Pilih kategori terlebih dahulu");
+    if (
+      !isGlobalIncome &&
+      !validateSelection(formData.categoryId, "kategori")
+    ) {
       return false;
     }
 
     // Validasi saldo untuk pengeluaran
     if (transactionType === "expense") {
-      if (!formData.expenseTypeId) {
-        Alert.alert("Error", "Pilih jenis pengeluaran terlebih dahulu");
+      if (!validateSelection(formData.expenseTypeId, "jenis pengeluaran")) {
         return false;
       }
 
       const selectedCategory = categories.find(
         (cat) => cat.id!.toString() === formData.categoryId
       );
-      if (selectedCategory && selectedCategory.balance < amount) {
-        Alert.alert(
-          "Error",
-          `Saldo kategori "${
-            selectedCategory.name
-          }" tidak mencukupi.\nSaldo: ${formatCurrency(
-            selectedCategory.balance
-          )}`
-        );
-        return false;
+      if (selectedCategory) {
+        if (
+          !validateSufficientBalance(
+            selectedCategory.balance,
+            amount,
+            `kategori "${selectedCategory.name}"`
+          )
+        ) {
+          return false;
+        }
       }
     }
 
@@ -321,9 +320,9 @@ export const AddTransactionScreen: React.FC = () => {
       }
 
       closeModal();
-      Alert.alert("Sukses", "Transaksi berhasil ditambahkan");
+      showSuccess("Transaksi berhasil ditambahkan");
     } catch (error) {
-      Alert.alert("Error", "Gagal menambahkan transaksi");
+      showError("Gagal menambahkan transaksi");
       console.error("Error saving transaction:", error);
     } finally {
       setSaving(false);

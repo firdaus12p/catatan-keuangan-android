@@ -3,6 +3,7 @@ import React, {
   ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -14,7 +15,10 @@ import {
   LoanPayment,
   Transaction,
 } from "../db/database";
-import { initializeNotifications } from "../utils/notificationHelper";
+import {
+  cleanupNotificationListener,
+  initializeNotifications,
+} from "../utils/notificationHelper";
 
 type MonthlyStats = {
   totalIncome: number;
@@ -673,6 +677,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       updateLoanStatus,
     ]
   );
+
+  // Cleanup notification listener saat AppProvider unmount
+  // ⚠️ FIXED: Menggunakan useEffect cleanup (React Native compatible)
+  useEffect(() => {
+    return () => {
+      cleanupNotificationListener();
+    };
+  }, []);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

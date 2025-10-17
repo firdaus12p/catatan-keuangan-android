@@ -3,7 +3,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   InteractionManager,
   Modal as RNModal,
@@ -28,12 +27,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
 import { Category, Loan, LoanPayment } from "../db/database";
 import { colors } from "../styles/commonStyles";
+import { showConfirm, showError, showSuccess } from "../utils/alertHelper";
+import { CHART, TIMING } from "../utils/constants";
 import { formatDate, getTodayString } from "../utils/dateHelper";
 import {
   formatCurrency,
   formatNumberInput,
   parseNumberInput,
 } from "../utils/formatCurrency";
+import {
+  validateNonEmptyString,
+  validatePositiveAmount,
+  validateSelection,
+  validateSufficientBalance,
+} from "../utils/validationHelper";
 
 interface LoanItemProps {
   loan: Loan;
@@ -88,18 +95,13 @@ const LoanItemComponent: React.FC<LoanItemProps> = ({
   };
 
   const handleMarkPaid = () => {
-    Alert.alert("Konfirmasi", `Tandai pinjaman ${loan.name} sebagai lunas?`, [
-      {
-        text: "Batal",
-        style: "cancel",
-      },
-      {
-        text: "Ya",
-        onPress: () => {
-          onUpdateStatus(loan.id!, "paid");
-        },
-      },
-    ]);
+    showConfirm(
+      "Konfirmasi",
+      `Tandai pinjaman ${loan.name} sebagai lunas?`,
+      () => {
+        onUpdateStatus(loan.id!, "paid");
+      }
+    );
   };
 
   const handlePartialPayment = () => {
@@ -110,9 +112,9 @@ const LoanItemComponent: React.FC<LoanItemProps> = ({
   const handleConfirmPartialPayment = () => {
     const amount = parseNumberInput(repaymentAmount);
     if (amount <= 0 || amount > loan.amount) {
-      Alert.alert(
-        "Maaf",
-        "Jumlah pembayaran yang anda masukkan tidak sesuai dengan jumlah pinjaman"
+      showError(
+        "Jumlah pembayaran yang anda masukkan tidak sesuai dengan jumlah pinjaman",
+        "Maaf"
       );
       return;
     }
@@ -122,22 +124,15 @@ const LoanItemComponent: React.FC<LoanItemProps> = ({
   };
 
   const handleDelete = () => {
-    Alert.alert(
+    showConfirm(
       "Hapus Pinjaman",
       `Apakah Anda yakin ingin menghapus pinjaman ${loan.name}?`,
-      [
-        {
-          text: "Batal",
-          style: "cancel",
-        },
-        {
-          text: "Hapus",
-          style: "destructive",
-          onPress: () => {
-            onDelete(loan.id!);
-          },
-        },
-      ]
+      () => {
+        onDelete(loan.id!);
+      },
+      undefined,
+      "Hapus",
+      "Batal"
     );
   };
 
@@ -339,19 +334,16 @@ export const LoanScreen: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
-    if (!formData.name.trim()) {
-      Alert.alert("Error", "Nama peminjam tidak boleh kosong");
+    if (!validateNonEmptyString(formData.name, "Nama peminjam")) {
       return false;
     }
 
     const amount = parseNumberInput(formData.amount);
-    if (amount <= 0) {
-      Alert.alert("Error", "Jumlah pinjaman harus lebih dari 0");
+    if (!validatePositiveAmount(amount, "Jumlah pinjaman")) {
       return false;
     }
 
-    if (!formData.categoryId) {
-      Alert.alert("Error", "Pilih kategori sumber pinjaman");
+    if (!validateSelection(formData.categoryId, "kategori sumber pinjaman")) {
       return false;
     }
 
@@ -359,14 +351,16 @@ export const LoanScreen: React.FC = () => {
     const selectedCategory = categories.find(
       (cat) => cat.id!.toString() === formData.categoryId
     );
-    if (selectedCategory && selectedCategory.balance < amount) {
-      Alert.alert(
-        "Maaf",
-        `Saldo kategori "${selectedCategory.name}" hanya ${formatCurrency(
-          selectedCategory.balance
-        )} silahkan pilih kategori lain`
-      );
-      return false;
+    if (selectedCategory) {
+      if (
+        !validateSufficientBalance(
+          selectedCategory.balance,
+          amount,
+          `kategori "${selectedCategory.name}"`
+        )
+      ) {
+        return false;
+      }
     }
 
     return true;
@@ -386,9 +380,9 @@ export const LoanScreen: React.FC = () => {
 
       await addLoan(loanData);
       closeModal();
-      Alert.alert("Sukses", "Pinjaman berhasil ditambahkan");
+      showSuccess("Pinjaman berhasil ditambahkan");
     } catch (error) {
-      Alert.alert("Error", "Gagal menambahkan pinjaman");
+      showError("Gagal menambahkan pinjaman");
       console.error("Error saving loan:", error);
     }
   };
@@ -401,9 +395,9 @@ export const LoanScreen: React.FC = () => {
     ) => {
       try {
         await updateLoanStatus(id, status, repaymentAmount);
-        Alert.alert("Sukses", "Status pinjaman berhasil diperbarui");
+        showSuccess("Status pinjaman berhasil diperbarui");
       } catch (error) {
-        Alert.alert("Error", "Gagal memperbarui status pinjaman");
+        showError("Gagal memperbarui status pinjaman");
         console.error("Error updating loan status:", error);
       }
     },
@@ -414,9 +408,9 @@ export const LoanScreen: React.FC = () => {
     async (id: number) => {
       try {
         await deleteLoan(id);
-        Alert.alert("Sukses", "Pinjaman berhasil dihapus");
+        showSuccess("Pinjaman berhasil dihapus");
       } catch (error) {
-        Alert.alert("Error", "Gagal menghapus pinjaman");
+        showError("Gagal menghapus pinjaman");
         console.error("Error deleting loan:", error);
       }
     },
@@ -431,7 +425,7 @@ export const LoanScreen: React.FC = () => {
         setSelectedLoanName(loanName);
         setPaymentHistoryVisible(true);
       } catch (error) {
-        Alert.alert("Error", "Gagal memuat history pembayaran");
+        showError("Gagal memuat history pembayaran");
         console.error("Error loading payment history:", error);
       }
     },
@@ -444,7 +438,7 @@ export const LoanScreen: React.FC = () => {
     setTimeout(() => {
       setPaymentHistory([]);
       setSelectedLoanName("");
-    }, 300);
+    }, TIMING.MODAL_TRANSITION_DELAY);
   }, []);
 
   // Filter loans berdasarkan status
@@ -980,7 +974,7 @@ const styles = StyleSheet.create({
     overflow: "hidden", // Clip any overflow content
   },
   paymentList: {
-    maxHeight: 300, // Reduced from 400 to 300
+    maxHeight: CHART.MODAL_MAX_HEIGHT, // Reduced from 400 to 300
     marginVertical: 12, // Reduced from 16 to 12 for more compact design
     borderWidth: 0, // Remove any border
   },

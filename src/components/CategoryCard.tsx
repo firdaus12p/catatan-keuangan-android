@@ -4,6 +4,7 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { Card, IconButton, ProgressBar } from "react-native-paper";
 import { Category } from "../db/database";
 import { colors } from "../styles/commonStyles";
+import { BALANCE_THRESHOLDS } from "../utils/constants";
 import { formatCurrency } from "../utils/formatCurrency";
 
 interface CategoryCardProps {
@@ -32,8 +33,8 @@ export const CategoryCard: React.FC<CategoryCardProps> = React.memo(
 
     // Warna berdasarkan saldo
     const getBalanceColor = (balance: number) => {
-      if (balance > 100000) return "#4CAF50"; // Hijau untuk saldo tinggi
-      if (balance > 50000) return "#FF9800"; // Orange untuk saldo sedang
+      if (balance > BALANCE_THRESHOLDS.HIGH) return "#4CAF50"; // Hijau untuk saldo tinggi
+      if (balance > BALANCE_THRESHOLDS.MEDIUM) return "#FF9800"; // Orange untuk saldo sedang
       if (balance > 0) return "#FFC107"; // Kuning untuk saldo rendah
       return "#F44336"; // Merah untuk saldo kosong/minus
     };

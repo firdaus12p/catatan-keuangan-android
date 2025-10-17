@@ -2,14 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  Alert,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   Appbar,
   Button,
@@ -21,6 +14,8 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../styles/commonStyles";
+import { showError, showInfo, showSuccess } from "../utils/alertHelper";
+import { TIMING } from "../utils/constants";
 import {
   NotificationSettings,
   cancelScheduledNotification,
@@ -82,7 +77,7 @@ export const NotificationScreen: React.FC = React.memo(() => {
       setHasActiveNotification(hasScheduled);
     } catch (error) {
       console.error("Error loading notification settings:", error);
-      Alert.alert("Error", "Gagal memuat pengaturan notifikasi");
+      showError("Gagal memuat pengaturan notifikasi");
     } finally {
       // Hanya set loading false dan mark sebagai initialized pada load pertama
       if (!isInitialized) {
@@ -98,11 +93,11 @@ export const NotificationScreen: React.FC = React.memo(() => {
       if (enabled) {
         const hasPermission = await requestNotificationPermissions();
         if (!hasPermission) {
-          Alert.alert(
-            "Permission Diperlukan",
+          showInfo(
             __DEV__
               ? "Di Expo Go, fitur notifikasi terbatas. Untuk testing lengkap, gunakan production build (APK). Atau aktifkan manual di pengaturan sistem Android."
-              : "Aplikasi memerlukan izin notifikasi untuk mengirim pengingat. Silakan aktifkan di pengaturan perangkat."
+              : "Aplikasi memerlukan izin notifikasi untuk mengirim pengingat. Silakan aktifkan di pengaturan perangkat.",
+            "Permission Diperlukan"
           );
           return;
         }
@@ -120,19 +115,19 @@ export const NotificationScreen: React.FC = React.memo(() => {
         // Jadwalkan notifikasi
         await scheduleNotification(updatedSettings);
         setHasActiveNotification(true);
-        Alert.alert(
-          "Notifikasi Diaktifkan",
+        showSuccess(
           `Pengingat akan dikirim setiap hari pada pukul ${formatTimeForDisplay(
             updatedSettings.time
-          )}`
+          )}`,
+          "Notifikasi Diaktifkan"
         );
       } else {
         // Batalkan notifikasi
         await cancelScheduledNotification();
         setHasActiveNotification(false);
-        Alert.alert(
-          "Notifikasi Dinonaktifkan",
-          "Pengingat harian telah dibatalkan"
+        showSuccess(
+          "Pengingat harian telah dibatalkan",
+          "Notifikasi Dinonaktifkan"
         );
       }
     } catch (error) {
@@ -142,12 +137,12 @@ export const NotificationScreen: React.FC = React.memo(() => {
         error instanceof Error ? error.message : String(error);
 
       if (errorMessage.includes("tidak didukung di environment ini")) {
-        Alert.alert(
-          "Expo Go Limitation",
-          "Notifikasi terbatas di Expo Go. Di production build (APK), fitur ini akan bekerja normal dengan permission dialog otomatis."
+        showInfo(
+          "Notifikasi terbatas di Expo Go. Di production build (APK), fitur ini akan bekerja normal dengan permission dialog otomatis.",
+          "Expo Go Limitation"
         );
       } else {
-        Alert.alert("Error", `Gagal mengatur notifikasi: ${errorMessage}`);
+        showError(`Gagal mengatur notifikasi: ${errorMessage}`);
       }
     }
   };
@@ -184,18 +179,18 @@ export const NotificationScreen: React.FC = React.memo(() => {
       // Jika notifikasi aktif, jadwal ulang dengan waktu baru
       if (updatedSettings.isEnabled) {
         await scheduleNotification(updatedSettings);
-        Alert.alert(
-          "Waktu Diperbarui",
+        showSuccess(
           `Pengingat akan dikirim setiap hari pada pukul ${formatTimeForDisplay(
             timeString
-          )}`
+          )}`,
+          "Waktu Diperbarui"
         );
       }
 
       setTimePickerVisible(false);
     } catch (error) {
       console.error("Error saving time change:", error);
-      Alert.alert("Error", "Gagal menyimpan perubahan waktu");
+      showError("Gagal menyimpan perubahan waktu");
     }
   };
 
@@ -211,23 +206,22 @@ export const NotificationScreen: React.FC = React.memo(() => {
     try {
       const hasPermission = await requestNotificationPermissions();
       if (!hasPermission) {
-        Alert.alert("Error", "Permission notifikasi diperlukan");
+        showError("Permission notifikasi diperlukan");
         return;
       }
 
       // Kirim test notification
       await scheduleNotification({
         ...settings,
-        time: new Date(Date.now() + 3000).toTimeString().slice(0, 5), // 3 detik dari sekarang
+        time: new Date(Date.now() + TIMING.TEST_NOTIFICATION_DELAY)
+          .toTimeString()
+          .slice(0, 5), // 3 detik dari sekarang
       });
 
-      Alert.alert(
-        "Test Notifikasi",
-        "Notifikasi test akan muncul dalam 3 detik"
-      );
+      showInfo("Notifikasi test akan muncul dalam 3 detik", "Test Notifikasi");
     } catch (error) {
       console.error("Error sending test notification:", error);
-      Alert.alert("Error", "Gagal mengirim test notifikasi");
+      showError("Gagal mengirim test notifikasi");
     }
   };
 

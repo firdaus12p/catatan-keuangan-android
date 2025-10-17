@@ -5,6 +5,7 @@ import { BarChart, PieChart } from "react-native-chart-kit";
 import { Card } from "react-native-paper";
 import { Category } from "../db/database";
 import { colors } from "../styles/commonStyles";
+import { CHART, CHART_COLORS } from "../utils/constants";
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -78,7 +79,11 @@ export const ExpenseCharts = React.memo<ExpenseChartsProps>(
                   ? cat.name.substring(0, 8) + "..."
                   : cat.name,
               population: cat.balance,
-              color: `hsl(${(index * 60) % 360}, 50%, 50%)`,
+              color: `hsl(${
+                (index * CHART_COLORS.HSL_HUE_STEP) % CHART_COLORS.HSL_MAX_HUE
+              }, ${CHART_COLORS.HSL_SATURATION}%, ${
+                CHART_COLORS.HSL_LIGHTNESS
+              }%)`,
               legendFontColor: "#333333",
               legendFontSize: 12,
             }))
@@ -104,8 +109,8 @@ export const ExpenseCharts = React.memo<ExpenseChartsProps>(
               {totalIncome > 0 || totalExpense > 0 ? (
                 <MemoizedBarChart
                   data={incomeExpenseData}
-                  width={screenWidth - 64}
-                  height={200}
+                  width={screenWidth - 60}
+                  height={CHART.DEFAULT_HEIGHT}
                   chartConfig={chartConfig}
                   style={styles.chart}
                   yAxisLabel=""
@@ -134,7 +139,7 @@ export const ExpenseCharts = React.memo<ExpenseChartsProps>(
                 <MemoizedPieChart
                   data={categoryBalanceData}
                   width={screenWidth - 10}
-                  height={200}
+                  height={CHART.DEFAULT_HEIGHT}
                   chartConfig={chartConfig}
                   accessor="population"
                   backgroundColor="transparent"
@@ -195,7 +200,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   emptyChartContainer: {
-    height: 200,
+    height: CHART.DEFAULT_HEIGHT,
     justifyContent: "center",
     alignItems: "center",
   },

@@ -2,7 +2,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   InteractionManager,
   StyleSheet,
@@ -25,11 +24,19 @@ import { CategoryCard } from "../components/CategoryCard";
 import { useApp } from "../context/AppContext";
 import { Category } from "../db/database";
 import { colors } from "../styles/commonStyles";
+import { showError, showSuccess } from "../utils/alertHelper";
 import {
   formatCurrency,
   formatNumberInput,
   parseNumberInput,
 } from "../utils/formatCurrency";
+import {
+  validateNonEmptyString,
+  validatePercentage,
+  validatePositiveAmount,
+  validateSelection,
+  validateSufficientBalance,
+} from "../utils/validationHelper";
 
 export const CategoryScreen: React.FC = () => {
   const {
@@ -130,14 +137,12 @@ export const CategoryScreen: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
-    if (!formData.name.trim()) {
-      Alert.alert("Error", "Nama kategori tidak boleh kosong");
+    if (!validateNonEmptyString(formData.name.trim(), "Nama kategori")) {
       return false;
     }
 
     const percentage = parseFloat(formData.percentage);
-    if (isNaN(percentage) || percentage <= 0 || percentage > 100) {
-      Alert.alert("Error", "Persentase harus antara 1-100");
+    if (!validatePercentage(percentage)) {
       return false;
     }
 
@@ -147,8 +152,7 @@ export const CategoryScreen: React.FC = () => {
       .reduce((sum, cat) => sum + cat.percentage, 0);
 
     if (currentTotal + percentage > 100) {
-      Alert.alert(
-        "Error",
+      showError(
         `Total persentase akan menjadi ${(currentTotal + percentage).toFixed(
           1
         )}%. Maximum adalah 100%.`
@@ -176,14 +180,13 @@ export const CategoryScreen: React.FC = () => {
       }
 
       closeModal();
-      Alert.alert(
-        "Sukses",
+      showSuccess(
         editingCategory
           ? "Kategori berhasil diperbarui"
           : "Kategori berhasil ditambahkan"
       );
     } catch (error) {
-      Alert.alert("Error", "Gagal menyimpan kategori");
+      showError("Gagal menyimpan kategori");
       console.error("Error saving category:", error);
     }
   };
@@ -191,9 +194,9 @@ export const CategoryScreen: React.FC = () => {
   const handleDelete = async (id: number) => {
     try {
       await deleteCategory(id);
-      Alert.alert("Sukses", "Kategori berhasil dihapus");
+      showSuccess("Kategori berhasil dihapus");
     } catch (error) {
-      Alert.alert("Error", "Gagal menghapus kategori");
+      showError("Gagal menghapus kategori");
       console.error("Error deleting category:", error);
     }
   };
@@ -222,29 +225,26 @@ export const CategoryScreen: React.FC = () => {
 
     const amountValue = parseNumberInput(transferAmount);
 
-    if (!transferTargetId) {
-      Alert.alert("Error", "Pilih kategori tujuan terlebih dahulu");
+    if (!validateSelection(transferTargetId, "kategori tujuan")) {
       return;
     }
 
     if (transferSourceCategory.id!.toString() === transferTargetId) {
-      Alert.alert(
-        "Error",
-        "Kategori tujuan tidak boleh sama dengan kategori sumber"
-      );
+      showError("Kategori tujuan tidak boleh sama dengan kategori sumber");
       return;
     }
 
-    if (amountValue <= 0) {
-      Alert.alert("Error", "Jumlah yang dipindahkan harus lebih dari 0");
+    if (!validatePositiveAmount(amountValue, "Jumlah yang dipindahkan")) {
       return;
     }
 
-    if (transferSourceCategory.balance < amountValue) {
-      Alert.alert(
-        "Error",
-        `Saldo kategori "${transferSourceCategory.name}" tidak mencukupi`
-      );
+    if (
+      !validateSufficientBalance(
+        transferSourceCategory.balance,
+        amountValue,
+        `"${transferSourceCategory.name}"`
+      )
+    ) {
       return;
     }
 
@@ -261,8 +261,7 @@ export const CategoryScreen: React.FC = () => {
         (cat) => cat.id === targetIdNumber
       )?.name;
 
-      Alert.alert(
-        "Sukses",
+      showSuccess(
         `Saldo sebesar ${formatCurrency(
           amountValue
         )} berhasil dipindahkan ke kategori "${targetName ?? "Tujuan"}"`
@@ -270,7 +269,7 @@ export const CategoryScreen: React.FC = () => {
       closeTransferModal();
     } catch (error) {
       console.error("Error transferring category balance:", error);
-      Alert.alert("Error", "Gagal memindahkan saldo kategori");
+      showError("Gagal memindahkan saldo kategori");
     } finally {
       setTransferLoading(false);
     }

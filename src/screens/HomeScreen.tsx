@@ -27,10 +27,14 @@ import {
   getAllocationDeficit,
   isAllocationComplete,
 } from "../utils/allocation";
+import { TIMING } from "../utils/constants";
 import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
 
 // Hook untuk animasi count-up
-const useCountUp = (targetValue: number, duration: number = 1000) => {
+const useCountUp = (
+  targetValue: number,
+  duration: number = TIMING.COUNTUP_DEFAULT
+) => {
   const [currentValue, setCurrentValue] = useState(0);
   const startTimeRef = useRef<number | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -122,7 +126,10 @@ export const HomeScreen: React.FC = () => {
     summarySnapshot?.saldoBersih ?? monthlyStats.saldoBersih;
 
   // Hook untuk animasi count-up Saldo Bersih
-  const animatedSaldoBersih = useCountUp(displaySaldoBersih, 1500);
+  const animatedSaldoBersih = useCountUp(
+    displaySaldoBersih,
+    TIMING.COUNTUP_NET
+  );
 
   // Hook untuk animasi count-up saldo kategori (fixed amount untuk menghindari hook rules violation)
   const selectedCategories = useMemo(() => {
@@ -135,15 +142,24 @@ export const HomeScreen: React.FC = () => {
   const category1Balance = selectedCategories[0]?.balance || 0;
   const category2Balance = selectedCategories[1]?.balance || 0;
 
-  const animatedCategory1Balance = useCountUp(category1Balance, 1200);
-  const animatedCategory2Balance = useCountUp(category2Balance, 1200);
+  const animatedCategory1Balance = useCountUp(
+    category1Balance,
+    TIMING.COUNTUP_BALANCE
+  );
+  const animatedCategory2Balance = useCountUp(
+    category2Balance,
+    TIMING.COUNTUP_BALANCE
+  );
 
   // Hook untuk animasi Total Gabungan kategori
   const totalCombinedBalance = useMemo(() => {
     return selectedCategories.reduce((sum, cat) => sum + cat.balance, 0);
   }, [selectedCategories]);
 
-  const animatedTotalCombined = useCountUp(totalCombinedBalance, 1300);
+  const animatedTotalCombined = useCountUp(
+    totalCombinedBalance,
+    TIMING.COUNTUP_TOTAL
+  );
 
   // Helper function untuk mendapatkan nilai animasi berdasarkan index
   const getAnimatedCategoryBalance = useCallback(

@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Localization from "expo-localization";
 import { Platform } from "react-native";
+import { TIME, TIMING } from "./constants";
 
 // Conditional import untuk expo-notifications
 let Notifications: any = null;
@@ -59,6 +60,9 @@ export interface NotificationSettings {
 // Key untuk AsyncStorage
 const NOTIFICATION_SETTINGS_KEY = "notification_settings";
 const NOTIFICATION_ID_KEY = "scheduled_notification_id";
+
+// Store listener subscription untuk cleanup
+let notificationListenerSubscription: any = null;
 
 /**
  * Request permission untuk notifikasi
@@ -210,7 +214,7 @@ export const scheduleNotification = async (
     }
 
     const secondsUntilTrigger = Math.floor(
-      (nextTriggerTime.getTime() - now.getTime()) / 1000
+      (nextTriggerTime.getTime() - now.getTime()) / TIME.SECONDS_IN_MILLISECOND
     );
 
     if (Platform.OS === "android") {
@@ -280,27 +284,33 @@ export const scheduleNotification = async (
 
 /**
  * Setup listener untuk reschedule notifikasi Android
+ * ⚠️ FIXED: Sekarang menyimpan subscription untuk cleanup
  */
 const setupNotificationListener = async (settings: NotificationSettings) => {
   const notificationModule = await getNotifications();
   if (!notificationModule) return null;
 
-  // Listener untuk ketika notifikasi diterima
-  const subscription = notificationModule.addNotificationReceivedListener(
-    () => {
+  // Cleanup listener lama jika ada
+  if (notificationListenerSubscription) {
+    notificationListenerSubscription.remove();
+    notificationListenerSubscription = null;
+  }
+
+  // Setup listener baru
+  notificationListenerSubscription =
+    notificationModule.addNotificationReceivedListener(() => {
       // Reschedule untuk hari berikutnya
       setTimeout(() => {
         scheduleNotification(settings);
-      }, 1000);
-    }
-  );
+      }, TIMING.NOTIFICATION_RESCHEDULE_DELAY);
+    });
 
-  // Return subscription untuk cleanup jika diperlukan
-  return subscription;
+  return notificationListenerSubscription;
 };
 
 /**
  * Batalkan notifikasi yang sudah dijadwalkan
+ * ⚠️ FIXED: Sekarang juga cleanup listener
  */
 export const cancelScheduledNotification = async (): Promise<void> => {
   try {
@@ -308,6 +318,12 @@ export const cancelScheduledNotification = async (): Promise<void> => {
     if (!notificationModule) {
       console.warn("Notifications not available - cannot cancel");
       return;
+    }
+
+    // Cleanup listener jika ada
+    if (notificationListenerSubscription) {
+      notificationListenerSubscription.remove();
+      notificationListenerSubscription = null;
     }
 
     // Dapatkan ID notifikasi yang tersimpan
@@ -415,4 +431,16 @@ export const formatTimeForDisplay = (timeString: string): string => {
 export const isValidTimeFormat = (timeString: string): boolean => {
   const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
   return timeRegex.test(timeString);
+};
+
+/**
+ * Cleanup notification listener
+ * ⚠️ NEW: Function untuk cleanup listener saat app unmount
+ */
+export const cleanupNotificationListener = (): void => {
+  if (notificationListenerSubscription) {
+    notificationListenerSubscription.remove();
+    notificationListenerSubscription = null;
+    console.log("Notification listener cleaned up");
+  }
 };

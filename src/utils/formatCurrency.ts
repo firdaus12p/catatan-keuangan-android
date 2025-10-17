@@ -1,11 +1,13 @@
 // Format angka menjadi format mata uang Rupiah
 export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+  const hasFraction = Math.abs(amount % 1) > Number.EPSILON;
+  const formatter = new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: hasFraction ? 2 : 0,
+  });
+
+  const formatted = formatter.format(Math.abs(amount));
+  return amount < 0 ? `-Rp${formatted}` : `Rp${formatted}`;
 };
 
 // Format angka tanpa simbol mata uang

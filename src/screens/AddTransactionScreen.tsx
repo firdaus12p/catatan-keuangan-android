@@ -40,6 +40,10 @@ import {
   formatNumberInput,
   parseNumberInput,
 } from "../utils/formatCurrency";
+import {
+  getAllocationDeficit,
+  isAllocationComplete,
+} from "../utils/allocation";
 
 export const AddTransactionScreen: React.FC = () => {
   const {
@@ -132,12 +136,15 @@ export const AddTransactionScreen: React.FC = () => {
 
   // Validasi total alokasi sebelum membuka modal
   const validateAllocation = useCallback(() => {
-    if (totalAllocationPercentage < 100) {
+    if (!isAllocationComplete(totalAllocationPercentage)) {
+      const deficit = getAllocationDeficit(totalAllocationPercentage);
       Alert.alert(
         "Alokasi Belum Lengkap",
         `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
           1
-        )}%.\n\nAnda perlu melengkapi alokasi hingga 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
+        )}%.\n\nTambahkan alokasi sebesar ${deficit.toFixed(
+          1
+        )}% lagi agar mencapai 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
         [
           {
             text: "OK",
@@ -152,7 +159,7 @@ export const AddTransactionScreen: React.FC = () => {
       return false;
     }
     return true;
-  }, [totalAllocationPercentage, router]);
+  }, [router, totalAllocationPercentage]);
 
   const resetForm = useCallback(() => {
     setFormData({

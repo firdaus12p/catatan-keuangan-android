@@ -5,6 +5,10 @@ import { Alert, StyleSheet } from "react-native";
 import { FAB, Portal } from "react-native-paper";
 import { useApp } from "../context/AppContext";
 import { colors } from "../styles/commonStyles";
+import {
+  getAllocationDeficit,
+  isAllocationComplete,
+} from "../utils/allocation";
 
 export const FloatingActionButtons: React.FC = React.memo(() => {
   const [open, setOpen] = useState(false);
@@ -18,12 +22,15 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
 
   // Validasi total alokasi sebelum membuka halaman transaksi
   const validateAllocation = useCallback(() => {
-    if (totalAllocationPercentage < 100) {
+    if (!isAllocationComplete(totalAllocationPercentage)) {
+      const deficit = getAllocationDeficit(totalAllocationPercentage);
       Alert.alert(
         "Alokasi Belum Lengkap",
         `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
           1
-        )}%.\n\nAnda perlu melengkapi alokasi hingga 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
+        )}%.\n\nTambahkan alokasi sebesar ${deficit.toFixed(
+          1
+        )}% lagi agar mencapai 100% sebelum mencatat transaksi.\n\nSilakan menuju halaman Kategori untuk menambah kategori atau mengatur ulang persentase.`,
         [
           {
             text: "OK",
@@ -41,7 +48,7 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
       return false;
     }
     return true;
-  }, [totalAllocationPercentage, router]);
+  }, [router, totalAllocationPercentage]);
 
   const onStateChange = ({ open }: { open: boolean }) => setOpen(open);
 

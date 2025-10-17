@@ -107,9 +107,27 @@ export const HomeScreen: React.FC = () => {
   const [expenseTypeBreakdown, setExpenseTypeBreakdown] = useState<
     ExpenseType[]
   >([]);
+  const [summarySnapshot, setSummarySnapshot] = useState<{
+    totalSaldo: number;
+    saldoBersih: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (selectedPeriod === "current") {
+      setSummarySnapshot({
+        totalSaldo: monthlyStats.totalSaldo,
+        saldoBersih: monthlyStats.saldoBersih,
+      });
+    }
+  }, [monthlyStats.totalSaldo, monthlyStats.saldoBersih, selectedPeriod]);
+
+  const displayTotalSaldo =
+    summarySnapshot?.totalSaldo ?? monthlyStats.totalSaldo;
+  const displaySaldoBersih =
+    summarySnapshot?.saldoBersih ?? monthlyStats.saldoBersih;
 
   // Hook untuk animasi count-up Saldo Bersih
-  const animatedSaldoBersih = useCountUp(monthlyStats.saldoBersih, 1500);
+  const animatedSaldoBersih = useCountUp(displaySaldoBersih, 1500);
 
   // Hook untuk animasi count-up saldo kategori (fixed amount untuk menghindari hook rules violation)
   const selectedCategories = useMemo(() => {
@@ -354,7 +372,7 @@ export const HomeScreen: React.FC = () => {
   }, [categories]);
 
   // Gunakan saldo bersih dari monthlyStats yang sudah dihitung dengan benar
-  const saldoBersih = monthlyStats.saldoBersih;
+  const saldoBersih = displaySaldoBersih;
 
   // Data untuk Income vs Expense Chart dengan memoization
   const incomeExpenseData = useMemo(
@@ -532,7 +550,7 @@ export const HomeScreen: React.FC = () => {
             />
             <Text style={styles.statLabel}>Total Saldo</Text>
             <Text style={styles.statValue}>
-              {formatCurrency(monthlyStats.totalSaldo)}
+              {formatCurrency(displayTotalSaldo)}
             </Text>
           </View>
 
@@ -554,15 +572,15 @@ export const HomeScreen: React.FC = () => {
 
           <View style={styles.statItem}>
             <MaterialIcons
-              name={saldoBersih >= 0 ? "savings" : "warning"}
+              name={displaySaldoBersih >= 0 ? "savings" : "warning"}
               size={24}
-              color={saldoBersih >= 0 ? "#4CAF50" : "#F44336"}
+              color={displaySaldoBersih >= 0 ? "#4CAF50" : "#F44336"}
             />
             <Text style={styles.statLabel}>Saldo Bersih</Text>
             <Text
               style={[
                 styles.statValue,
-                { color: saldoBersih >= 0 ? "#4CAF50" : "#F44336" },
+                { color: displaySaldoBersih >= 0 ? "#4CAF50" : "#F44336" },
               ]}
             >
               {formatCurrency(animatedSaldoBersih)}

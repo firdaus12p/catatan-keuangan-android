@@ -346,12 +346,13 @@ class Database {
   async deleteExpenseType(id: number): Promise<void> {
     if (!this.db) throw new Error("Database not initialized");
     try {
-      // Lepaskan relasi transaksi sebelum menghapus jenis
-      await this.db.runAsync(
-        "UPDATE transactions SET expense_type_id = NULL WHERE expense_type_id = ?",
-        [id]
-      );
-      await this.db.runAsync("DELETE FROM expense_types WHERE id = ?", [id]);
+      await this.db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.runAsync(
+          "UPDATE transactions SET expense_type_id = NULL WHERE expense_type_id = ?",
+          [id]
+        );
+        await txn.runAsync("DELETE FROM expense_types WHERE id = ?", [id]);
+      });
     } catch (error) {
       console.error("Error deleting expense type:", error);
       throw error;
@@ -403,43 +404,46 @@ class Database {
   async addTransaction(transaction: Omit<Transaction, "id">): Promise<number> {
     if (!this.db) throw new Error("Database not initialized");
     try {
-      const result = await this.db.runAsync(
-        "INSERT INTO transactions (type, amount, category_id, note, date, expense_type_id) VALUES (?, ?, ?, ?, ?, ?)",
-        [
-          transaction.type,
-          transaction.amount,
-          transaction.category_id,
-          transaction.note,
-          transaction.date,
-          transaction.expense_type_id ?? null,
-        ]
-      );
-
-      // Update saldo kategori
-      if (transaction.type === "income") {
-        await this.db.runAsync(
-          "UPDATE categories SET balance = balance + ? WHERE id = ?",
-          [transaction.amount, transaction.category_id]
+      let insertedId = 0;
+      await this.db.withExclusiveTransactionAsync(async (txn) => {
+        const result = await txn.runAsync(
+          "INSERT INTO transactions (type, amount, category_id, note, date, expense_type_id) VALUES (?, ?, ?, ?, ?, ?)",
+          [
+            transaction.type,
+            transaction.amount,
+            transaction.category_id,
+            transaction.note,
+            transaction.date,
+            transaction.expense_type_id ?? null,
+          ]
         );
-      } else {
-        await this.db.runAsync(
-          "UPDATE categories SET balance = balance - ? WHERE id = ?",
-          [transaction.amount, transaction.category_id]
-        );
-      }
+        insertedId = result.lastInsertRowId;
 
-      if (
-        transaction.type === "expense" &&
-        transaction.expense_type_id !== undefined &&
-        transaction.expense_type_id !== null
-      ) {
-        await this.db.runAsync(
-          "UPDATE expense_types SET total_spent = total_spent + ? WHERE id = ?",
-          [transaction.amount, transaction.expense_type_id]
-        );
-      }
+        if (transaction.type === "income") {
+          await txn.runAsync(
+            "UPDATE categories SET balance = balance + ? WHERE id = ?",
+            [transaction.amount, transaction.category_id]
+          );
+        } else {
+          await txn.runAsync(
+            "UPDATE categories SET balance = balance - ? WHERE id = ?",
+            [transaction.amount, transaction.category_id]
+          );
+        }
 
-      return result.lastInsertRowId;
+        if (
+          transaction.type === "expense" &&
+          transaction.expense_type_id !== undefined &&
+          transaction.expense_type_id !== null
+        ) {
+          await txn.runAsync(
+            "UPDATE expense_types SET total_spent = total_spent + ? WHERE id = ?",
+            [transaction.amount, transaction.expense_type_id]
+          );
+        }
+      });
+
+      return insertedId;
     } catch (error) {
       console.error("Error adding transaction:", error);
       throw error;
@@ -457,28 +461,28 @@ class Database {
       const date = new Date().toISOString();
 
       // Bagi pemasukan ke semua kategori berdasarkan persentase
-      for (const category of categories) {
-        const categoryAmount = (amount * category.percentage) / 100;
+      await this.db.withExclusiveTransactionAsync(async (txn) => {
+        for (const category of categories) {
+          const categoryAmount = (amount * category.percentage) / 100;
 
-        // Tambah transaksi
-        await this.db.runAsync(
-          "INSERT INTO transactions (type, amount, category_id, note, date, expense_type_id) VALUES (?, ?, ?, ?, ?, ?)",
-          [
-            "income",
-            categoryAmount,
-            category.id!,
-            `${note} (${category.percentage}%)`,
-            date,
-            null,
-          ]
-        );
+          await txn.runAsync(
+            "INSERT INTO transactions (type, amount, category_id, note, date, expense_type_id) VALUES (?, ?, ?, ?, ?, ?)",
+            [
+              "income",
+              categoryAmount,
+              category.id!,
+              `${note} (${category.percentage}%)`,
+              date,
+              null,
+            ]
+          );
 
-        // Update saldo kategori
-        await this.db.runAsync(
-          "UPDATE categories SET balance = balance + ? WHERE id = ?",
-          [categoryAmount, category.id!]
-        );
-      }
+          await txn.runAsync(
+            "UPDATE categories SET balance = balance + ? WHERE id = ?",
+            [categoryAmount, category.id!]
+          );
+        }
+      });
     } catch (error) {
       console.error("Error adding global income:", error);
       throw error;
@@ -501,21 +505,21 @@ class Database {
   async addLoan(loan: Omit<Loan, "id">): Promise<number> {
     if (!this.db) throw new Error("Database not initialized");
     try {
-      const result = await this.db.runAsync(
-        "INSERT INTO loans (name, amount, category_id, status, date) VALUES (?, ?, ?, ?, ?)",
-        [loan.name, loan.amount, loan.category_id, loan.status, loan.date]
-      );
+      let insertedId = 0;
+      await this.db.withExclusiveTransactionAsync(async (txn) => {
+        const result = await txn.runAsync(
+          "INSERT INTO loans (name, amount, category_id, status, date) VALUES (?, ?, ?, ?, ?)",
+          [loan.name, loan.amount, loan.category_id, loan.status, loan.date]
+        );
+        insertedId = result.lastInsertRowId;
 
-      // Kurangi saldo kategori saat membuat pinjaman
-      // Ini BUKAN transaksi expense, hanya perpindahan uang yang sudah ada
-      await this.db.runAsync(
-        "UPDATE categories SET balance = balance - ? WHERE id = ?",
-        [loan.amount, loan.category_id]
-      );
+        await txn.runAsync(
+          "UPDATE categories SET balance = balance - ? WHERE id = ?",
+          [loan.amount, loan.category_id]
+        );
+      });
 
-      // TIDAK dicatat sebagai transaksi - pinjaman hanya history tersendiri
-
-      return result.lastInsertRowId;
+      return insertedId;
     } catch (error) {
       console.error("Error adding loan:", error);
       throw error;
@@ -529,77 +533,68 @@ class Database {
   ): Promise<void> {
     if (!this.db) throw new Error("Database not initialized");
     try {
-      const loan = (await this.db.getFirstAsync(
-        "SELECT * FROM loans WHERE id = ?",
-        [id]
-      )) as Loan;
+      await this.db.withExclusiveTransactionAsync(async (txn) => {
+        const loan = (await txn.getFirstAsync(
+          "SELECT * FROM loans WHERE id = ?",
+          [id]
+        )) as Loan;
 
-      if (!loan) throw new Error("Loan not found");
+        if (!loan) throw new Error("Loan not found");
 
-      // Logika otomatis: jika pembayaran >= jumlah pinjaman, set status menjadi "paid"
-      let finalStatus = status;
-      let finalRepaymentAmount = repaymentAmount || 0;
+        let finalStatus = status;
+        let finalRepaymentAmount = repaymentAmount || 0;
 
-      if (
-        status === "half" &&
-        repaymentAmount &&
-        repaymentAmount >= loan.amount
-      ) {
-        finalStatus = "paid";
-        finalRepaymentAmount = loan.amount;
-      }
+        if (
+          status === "half" &&
+          repaymentAmount &&
+          repaymentAmount >= loan.amount
+        ) {
+          finalStatus = "paid";
+          finalRepaymentAmount = loan.amount;
+        }
 
-      // Kembalikan uang ke kategori sesuai status
-      if (finalStatus === "paid") {
-        // Lunas - kembalikan sisa jumlah pinjaman ke saldo kategori
-        await this.db.runAsync(
-          "UPDATE categories SET balance = balance + ? WHERE id = ?",
-          [loan.amount, loan.category_id]
-        );
+        finalRepaymentAmount = Math.min(finalRepaymentAmount, loan.amount);
+        const timestamp = new Date().toISOString();
 
-        // TIDAK dicatat sebagai income transaction - ini hanya pengembalian uang yang sudah ada
+        if (finalStatus === "paid") {
+          await txn.runAsync(
+            "UPDATE categories SET balance = balance + ? WHERE id = ?",
+            [loan.amount, loan.category_id]
+          );
 
-        // Catat pembayaran ke history loan payments
-        await this.db.runAsync(
-          "INSERT INTO loan_payments (loan_id, amount, payment_date, remaining_amount) VALUES (?, ?, ?, ?)",
-          [id, loan.amount, new Date().toISOString(), 0]
-        );
+          await txn.runAsync(
+            "INSERT INTO loan_payments (loan_id, amount, payment_date, remaining_amount) VALUES (?, ?, ?, ?)",
+            [id, loan.amount, timestamp, 0]
+          );
 
-        // Update status dan amount pinjaman menjadi 0
-        await this.db.runAsync(
-          "UPDATE loans SET status = ?, amount = 0 WHERE id = ?",
-          [finalStatus, id]
-        );
-      } else if (finalStatus === "half" && finalRepaymentAmount > 0) {
-        // Bayar sebagian - kembalikan sebagian uang ke saldo kategori
-        await this.db.runAsync(
-          "UPDATE categories SET balance = balance + ? WHERE id = ?",
-          [finalRepaymentAmount, loan.category_id]
-        );
+          await txn.runAsync(
+            "UPDATE loans SET status = ?, amount = 0 WHERE id = ?",
+            [finalStatus, id]
+          );
+        } else if (finalStatus === "half" && finalRepaymentAmount > 0) {
+          await txn.runAsync(
+            "UPDATE categories SET balance = balance + ? WHERE id = ?",
+            [finalRepaymentAmount, loan.category_id]
+          );
 
-        // TIDAK dicatat sebagai income transaction - ini hanya pengembalian sebagian uang yang sudah ada
+          const newLoanAmount = loan.amount - finalRepaymentAmount;
 
-        // Update amount pinjaman (kurangi dengan jumlah yang dibayar)
-        const newLoanAmount = loan.amount - finalRepaymentAmount;
+          await txn.runAsync(
+            "INSERT INTO loan_payments (loan_id, amount, payment_date, remaining_amount) VALUES (?, ?, ?, ?)",
+            [id, finalRepaymentAmount, timestamp, newLoanAmount]
+          );
 
-        // Catat pembayaran ke history loan payments
-        await this.db.runAsync(
-          "INSERT INTO loan_payments (loan_id, amount, payment_date, remaining_amount) VALUES (?, ?, ?, ?)",
-          [id, finalRepaymentAmount, new Date().toISOString(), newLoanAmount]
-        );
-
-        // Update status dan amount pinjaman
-        await this.db.runAsync(
-          "UPDATE loans SET status = ?, amount = ? WHERE id = ?",
-          [finalStatus, newLoanAmount, id]
-        );
-      } else {
-        // Hanya update status tanpa perubahan lain
-        await this.db.runAsync("UPDATE loans SET status = ? WHERE id = ?", [
-          finalStatus,
-          id,
-        ]);
-      }
+          await txn.runAsync(
+            "UPDATE loans SET status = ?, amount = ? WHERE id = ?",
+            [finalStatus, newLoanAmount, id]
+          );
+        } else {
+          await txn.runAsync("UPDATE loans SET status = ? WHERE id = ?", [
+            finalStatus,
+            id,
+          ]);
+        }
+      });
     } catch (error) {
       console.error("Error updating loan status:", error);
       throw error;

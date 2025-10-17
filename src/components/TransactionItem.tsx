@@ -5,6 +5,7 @@ import { Card } from "react-native-paper";
 import { Category, Transaction } from "../db/database";
 import { formatDate } from "../utils/dateHelper";
 import { formatCurrency } from "../utils/formatCurrency";
+import { colors } from "../styles/commonStyles";
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -17,6 +18,11 @@ export const TransactionItem: React.FC<TransactionItemProps> = React.memo(
     const categoryName =
       categories.find((cat) => cat.id === transaction.category_id)?.name ||
       "Kategori Tidak Diketahui";
+
+    const expenseTypeName =
+      transaction.type === "expense" && transaction.expense_type_name
+        ? transaction.expense_type_name
+        : null;
 
     // Tentukan warna dan icon berdasarkan tipe transaksi
     const isIncome = transaction.type === "income";
@@ -41,6 +47,11 @@ export const TransactionItem: React.FC<TransactionItemProps> = React.memo(
               <Text style={styles.noteText} numberOfLines={2}>
                 {transaction.note || "Tidak ada catatan"}
               </Text>
+              {expenseTypeName && (
+                <Text style={styles.expenseTypeText} numberOfLines={1}>
+                  Jenis: {expenseTypeName}
+                </Text>
+              )}
               <Text style={styles.dateText}>
                 {formatDate(transaction.date)}
               </Text>
@@ -99,6 +110,12 @@ const styles = StyleSheet.create({
   noteText: {
     fontSize: 14,
     color: "#666666",
+    marginBottom: 2,
+  },
+  expenseTypeText: {
+    fontSize: 12,
+    color: colors.expense,
+    fontWeight: "600",
     marginBottom: 2,
   },
   dateText: {

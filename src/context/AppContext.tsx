@@ -8,6 +8,7 @@ import React, {
 import {
   Category,
   database,
+  ExpenseType,
   Loan,
   LoanPayment,
   Transaction,
@@ -22,6 +23,13 @@ interface AppContextType {
   addCategory: (category: Omit<Category, "id">) => Promise<void>;
   updateCategory: (id: number, category: Omit<Category, "id">) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
+
+  // Expense Types
+  expenseTypes: ExpenseType[];
+  loadExpenseTypes: () => Promise<void>;
+  addExpenseType: (name: string) => Promise<number>;
+  updateExpenseType: (id: number, name: string) => Promise<void>;
+  deleteExpenseType: (id: number) => Promise<void>;
 
   // Transactions
   transactions: Transaction[];
@@ -84,6 +92,7 @@ interface AppProviderProps {
 // Provider Component
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({
@@ -112,6 +121,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await database.initializeDatabase();
       await loadCategories();
       await loadTransactions();
+      await loadExpenseTypes();
       await loadLoans();
 
       // Load statistik bulan ini
@@ -170,6 +180,56 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
+  // Expense Types methods
+  const loadExpenseTypes = useCallback(async (): Promise<void> => {
+    try {
+      const data = await database.getExpenseTypes();
+      setExpenseTypes(data);
+    } catch (error) {
+      console.error("Error loading expense types:", error);
+    }
+  }, []);
+
+  const addExpenseType = useCallback(
+    async (name: string): Promise<number> => {
+      try {
+        const insertedId = await database.addExpenseType(name);
+        await loadExpenseTypes();
+        return insertedId;
+      } catch (error) {
+        console.error("Error adding expense type:", error);
+        throw error;
+      }
+    },
+    [loadExpenseTypes]
+  );
+
+  const updateExpenseType = useCallback(
+    async (id: number, name: string): Promise<void> => {
+      try {
+        await database.updateExpenseType(id, name);
+        await loadExpenseTypes();
+      } catch (error) {
+        console.error("Error updating expense type:", error);
+        throw error;
+      }
+    },
+    [loadExpenseTypes]
+  );
+
+  const deleteExpenseType = useCallback(
+    async (id: number): Promise<void> => {
+      try {
+        await database.deleteExpenseType(id);
+        await loadExpenseTypes();
+      } catch (error) {
+        console.error("Error deleting expense type:", error);
+        throw error;
+      }
+    },
+    [loadExpenseTypes]
+  );
+
   // Transactions methods
   const loadTransactions = async (
     limit: number = 50,
@@ -190,6 +250,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await database.addTransaction(transaction);
       await loadTransactions(); // Refresh data
       await loadCategories(); // Refresh categories untuk update saldo
+       await loadExpenseTypes(); // Refresh jenis pengeluaran
 
       // Refresh statistik jika transaksi bulan ini
       const transactionDate = new Date(transaction.date);
@@ -340,6 +401,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await database.resetAllData();
       await loadCategories();
       await loadTransactions();
+      await loadExpenseTypes();
       await loadLoans();
       setMonthlyStats(createEmptyStats());
     } catch (error) {
@@ -356,6 +418,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await database.resetTransactions();
       await loadCategories();
       await loadTransactions();
+      await loadExpenseTypes();
       setMonthlyStats(createEmptyStats());
     } catch (error) {
       console.error("Error resetting transactions:", error);
@@ -414,6 +477,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await database.cleanupLoanTransactions();
       await loadTransactions();
       await loadCategories();
+      await loadExpenseTypes();
       // Reload monthly stats karena transactions berubah
       const now = new Date();
       await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
@@ -442,6 +506,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     addCategory,
     updateCategory,
     deleteCategory,
+
+    // Expense Types
+    expenseTypes,
+    loadExpenseTypes,
+    addExpenseType,
+    updateExpenseType,
+    deleteExpenseType,
 
     // Transactions
     transactions,

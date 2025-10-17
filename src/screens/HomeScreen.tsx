@@ -12,9 +12,11 @@ import {
   View,
 } from "react-native";
 import { BarChart, PieChart } from "react-native-chart-kit";
-import { Appbar, Card, Chip } from "react-native-paper";
+import { Appbar, Card, Chip, ProgressBar } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
+import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
+import { ExpenseType } from "../db/database";
 import { colors } from "../styles/commonStyles";
 import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
 import { formatCurrency } from "../utils/formatCurrency";
@@ -26,8 +28,13 @@ export const HomeScreen: React.FC = () => {
   const {
     categories,
     monthlyStats,
+    expenseTypes,
     loadCategories,
     loadMonthlyStats,
+    loadExpenseTypes,
+    addExpenseType,
+    updateExpenseType,
+    deleteExpenseType,
     initializeApp,
   } = useApp();
 
@@ -37,6 +44,8 @@ export const HomeScreen: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [showCategorySelector, setShowCategorySelector] = useState(false);
+  const [expenseTypeManagerVisible, setExpenseTypeManagerVisible] =
+    useState(false);
 
   // Initialize app dan load data
   useFocusEffect(
@@ -47,6 +56,7 @@ export const HomeScreen: React.FC = () => {
           setIsInitialized(true);
         } else {
           await loadCategories();
+          await loadExpenseTypes();
 
           // Load stats berdasarkan periode yang dipilih
           const now = new Date();
@@ -87,6 +97,33 @@ export const HomeScreen: React.FC = () => {
     return categories.reduce((sum, cat) => sum + cat.percentage, 0);
   }, [categories]);
 
+  const totalExpenseTypeSpent = useMemo(
+    () =>
+      expenseTypes.reduce(
+        (sum, type) => sum + (type.total_spent ?? 0),
+        0
+      ),
+    [expenseTypes]
+  );
+
+  const topExpenseType = useMemo<ExpenseType | null>(
+    () =>
+      expenseTypes.reduce<ExpenseType | null>((top, current) => {
+        if (!top || current.total_spent > top.total_spent) {
+          return current;
+        }
+        return top;
+      }, null),
+    [expenseTypes]
+  );
+
+  const topExpensePercentage = useMemo(() => {
+    if (!topExpenseType || totalExpenseTypeSpent <= 0) {
+      return 0;
+    }
+    return topExpenseType.total_spent / totalExpenseTypeSpent;
+  }, [topExpenseType, totalExpenseTypeSpent]);
+
   // Validasi total alokasi sebelum membuka halaman transaksi
   const validateAllocation = useCallback(() => {
     if (totalAllocationPercentage < 100) {
@@ -110,6 +147,35 @@ export const HomeScreen: React.FC = () => {
     }
     return true;
   }, [totalAllocationPercentage, router]);
+
+  const openExpenseTypeManager = useCallback(() => {
+    setExpenseTypeManagerVisible(true);
+  }, []);
+
+  const closeExpenseTypeManager = useCallback(() => {
+    setExpenseTypeManagerVisible(false);
+  }, []);
+
+  const handleCreateExpenseType = useCallback(
+    async (name: string) => {
+      await addExpenseType(name);
+    },
+    [addExpenseType]
+  );
+
+  const handleUpdateExpenseType = useCallback(
+    async (id: number, name: string) => {
+      await updateExpenseType(id, name);
+    },
+    [updateExpenseType]
+  );
+
+  const handleDeleteExpenseType = useCallback(
+    async (id: number) => {
+      await deleteExpenseType(id);
+    },
+    [deleteExpenseType]
+  );
 
   const handleTransactionNavigation = useCallback(
     (type: "income" | "expense") => {
@@ -517,6 +583,61 @@ export const HomeScreen: React.FC = () => {
           </View>
         </Card.Content>
       </Card>
+
+      {/* Expense Type Highlight */}
+      <Card style={styles.expenseHighlightCard} elevation={2}>
+        <Card.Content>
+          <View style={styles.expenseHighlightHeader}>
+            <Text style={styles.expenseHighlightTitle}>
+              Pengeluaran Terbanyak
+            </Text>
+            <TouchableOpacity
+              onPress={openExpenseTypeManager}
+              style={styles.expenseHighlightSettings}
+            >
+              <MaterialIcons
+                name="settings"
+                size={20}
+                color={colors.expense}
+              />
+            </TouchableOpacity>
+          </View>
+          {topExpenseType && topExpenseType.total_spent > 0 ? (
+            <>
+              <Text style={styles.expenseHighlightName}>
+                {topExpenseType.name}
+              </Text>
+              <Text style={styles.expenseHighlightAmount}>
+                {formatCurrency(topExpenseType.total_spent)}
+              </Text>
+              <View style={styles.expenseHighlightMeta}>
+                <Text style={styles.expenseHighlightPercentage}>
+                  {(topExpensePercentage * 100).toFixed(1)}%
+                </Text>
+                <Text style={styles.expenseHighlightTotal}>
+                  dari total {formatCurrency(totalExpenseTypeSpent)}
+                </Text>
+              </View>
+              <ProgressBar
+                progress={Math.min(Math.max(topExpensePercentage, 0), 1)}
+                color={colors.expense}
+                style={styles.expenseHighlightProgress}
+              />
+            </>
+          ) : (
+            <View style={styles.expenseHighlightEmpty}>
+              <MaterialIcons name="insights" size={48} color="#CCCCCC" />
+              <Text style={styles.emptyChartText}>
+                Belum ada data pengeluaran
+              </Text>
+              <Text style={styles.expenseHighlightDescription}>
+                Tambahkan transaksi pengeluaran untuk melihat jenis
+                yang paling mendominasi.
+              </Text>
+            </View>
+          )}
+        </Card.Content>
+      </Card>
     </View>
   );
 
@@ -546,6 +667,15 @@ export const HomeScreen: React.FC = () => {
         {renderCategoryBalances()}
         {renderCharts()}
       </ScrollView>
+
+      <ExpenseTypeManagerModal
+        visible={expenseTypeManagerVisible}
+        onDismiss={closeExpenseTypeManager}
+        expenseTypes={expenseTypes}
+        onCreate={handleCreateExpenseType}
+        onUpdate={handleUpdateExpenseType}
+        onDelete={handleDeleteExpenseType}
+      />
     </SafeAreaView>
   );
 };
@@ -674,6 +804,68 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: "#999999",
+    textAlign: "center",
+  },
+  expenseHighlightCard: {
+    margin: 16,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  expenseHighlightHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  expenseHighlightTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.home,
+  },
+  expenseHighlightSettings: {
+    padding: 4,
+  },
+  expenseHighlightName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  expenseHighlightAmount: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: colors.expense,
+    marginTop: 4,
+  },
+  expenseHighlightMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  expenseHighlightPercentage: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.expense,
+  },
+  expenseHighlightTotal: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  expenseHighlightProgress: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFCDD2",
+    marginTop: 8,
+  },
+  expenseHighlightEmpty: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  expenseHighlightDescription: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
     textAlign: "center",
   },
   // Category Balances Styles

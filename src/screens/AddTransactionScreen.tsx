@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
@@ -18,6 +18,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TransactionItem } from "../components/TransactionItem";
+import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
 import { useApp } from "../context/AppContext";
 import { Transaction } from "../db/database";
 import { colors } from "../styles/commonStyles";
@@ -37,10 +38,15 @@ export const AddTransactionScreen: React.FC = () => {
   const {
     categories,
     transactions,
+    expenseTypes,
     loadCategories,
     loadTransactions,
+    loadExpenseTypes,
     addTransaction,
     addGlobalIncome,
+    addExpenseType,
+    updateExpenseType,
+    deleteExpenseType,
   } = useApp();
 
   const { action } = useLocalSearchParams<{ action?: string }>();
@@ -55,10 +61,13 @@ export const AddTransactionScreen: React.FC = () => {
     amount: "",
     categoryId: "",
     note: "",
+    expenseTypeId: "",
   });
   const [filter, setFilter] = useState<"all" | "current" | "previous">(
     "current"
   );
+  const [expenseTypeManagerVisible, setExpenseTypeManagerVisible] =
+    useState(false);
 
   // Handle floating action button actions
   useEffect(() => {
@@ -78,8 +87,35 @@ export const AddTransactionScreen: React.FC = () => {
     React.useCallback(() => {
       loadCategories();
       loadTransactions();
+      loadExpenseTypes();
     }, [])
   );
+
+  // Set default expense type saat tersedia
+  useEffect(() => {
+    if (
+      transactionType === "expense" &&
+      !formData.expenseTypeId &&
+      expenseTypes.length > 0
+    ) {
+      const firstType = expenseTypes[0];
+      if (firstType?.id) {
+        setFormData((prev) => ({
+          ...prev,
+          expenseTypeId: firstType.id!.toString(),
+        }));
+      }
+    }
+  }, [expenseTypes, transactionType, formData.expenseTypeId]);
+
+  useEffect(() => {
+    if (transactionType === "income" && formData.expenseTypeId) {
+      setFormData((prev) => ({
+        ...prev,
+        expenseTypeId: "",
+      }));
+    }
+  }, [transactionType, formData.expenseTypeId]);
 
   // Hitung total persentase alokasi dari semua kategori
   const totalAllocationPercentage = useMemo(() => {
@@ -115,6 +151,7 @@ export const AddTransactionScreen: React.FC = () => {
       amount: "",
       categoryId: "",
       note: "",
+      expenseTypeId: "",
     });
     setIsGlobalIncome(false);
     setTransactionType("income");
@@ -157,6 +194,11 @@ export const AddTransactionScreen: React.FC = () => {
 
     // Validasi saldo untuk pengeluaran
     if (transactionType === "expense") {
+      if (!formData.expenseTypeId) {
+        Alert.alert("Error", "Pilih jenis pengeluaran terlebih dahulu");
+        return false;
+      }
+
       const selectedCategory = categories.find(
         (cat) => cat.id!.toString() === formData.categoryId
       );
@@ -178,9 +220,48 @@ export const AddTransactionScreen: React.FC = () => {
     formData.amount,
     isGlobalIncome,
     formData.categoryId,
+    formData.expenseTypeId,
     transactionType,
     categories,
   ]);
+
+  const openExpenseTypeManager = useCallback(() => {
+    setExpenseTypeManagerVisible(true);
+  }, []);
+
+  const closeExpenseTypeManager = useCallback(() => {
+    setExpenseTypeManagerVisible(false);
+  }, []);
+
+  const handleCreateExpenseType = useCallback(
+    async (name: string) => {
+      const insertedId = await addExpenseType(name);
+      setFormData((prev) => ({
+        ...prev,
+        expenseTypeId: insertedId.toString(),
+      }));
+    },
+    [addExpenseType]
+  );
+
+  const handleUpdateExpenseType = useCallback(
+    async (id: number, name: string) => {
+      await updateExpenseType(id, name);
+    },
+    [updateExpenseType]
+  );
+
+  const handleDeleteExpenseType = useCallback(
+    async (id: number) => {
+      await deleteExpenseType(id);
+      setFormData((prev) => ({
+        ...prev,
+        expenseTypeId:
+          prev.expenseTypeId === id.toString() ? "" : prev.expenseTypeId,
+      }));
+    },
+    [deleteExpenseType]
+  );
 
   const handleSave = useCallback(async () => {
     if (!validateForm()) return;
@@ -206,6 +287,10 @@ export const AddTransactionScreen: React.FC = () => {
             formData.note ||
             (transactionType === "income" ? "Pemasukan" : "Pengeluaran"),
           date: getTodayString(),
+          expense_type_id:
+            transactionType === "expense" && formData.expenseTypeId
+              ? parseInt(formData.expenseTypeId, 10)
+              : null,
         };
 
         await addTransaction(transactionData);
@@ -519,6 +604,59 @@ export const AddTransactionScreen: React.FC = () => {
               </View>
             )}
 
+            {transactionType === "expense" && !isGlobalIncome && (
+              <View style={styles.expenseTypeSection}>
+                <View style={styles.expenseTypeHeader}>
+                  <Text style={styles.expenseTypeLabel}>Jenis Pengeluaran:</Text>
+                  <TouchableOpacity
+                    onPress={openExpenseTypeManager}
+                    style={styles.expenseTypeManageButton}
+                  >
+                    <MaterialIcons
+                      name="settings"
+                      size={18}
+                      color={colors.expense}
+                    />
+                    <Text style={styles.expenseTypeManageText}>Kelola</Text>
+                  </TouchableOpacity>
+                </View>
+                {expenseTypes.length > 0 ? (
+                  <RadioButton.Group
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, expenseTypeId: value })
+                    }
+                    value={formData.expenseTypeId}
+                  >
+                    {expenseTypes.map((type) => (
+                      <View key={type.id} style={styles.expenseTypeItem}>
+                        <RadioButton value={type.id!.toString()} />
+                        <View style={styles.expenseTypeInfo}>
+                          <Text style={styles.expenseTypeName}>{type.name}</Text>
+                          <Text style={styles.expenseTypeSpent}>
+                            Total: {formatCurrency(type.total_spent)}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </RadioButton.Group>
+                ) : (
+                  <View style={styles.emptyExpenseType}>
+                    <Text style={styles.emptyExpenseTypeText}>
+                      Belum ada jenis pengeluaran
+                    </Text>
+                    <Button
+                      mode="outlined"
+                      icon="plus"
+                      onPress={openExpenseTypeManager}
+                      compact
+                    >
+                      Tambah Jenis
+                    </Button>
+                  </View>
+                )}
+              </View>
+            )}
+
             <TextInput
               label="Catatan (Opsional)"
               value={formData.note}
@@ -549,6 +687,15 @@ export const AddTransactionScreen: React.FC = () => {
           </KeyboardAwareScrollView>
         </Modal>
       </Portal>
+
+      <ExpenseTypeManagerModal
+        visible={expenseTypeManagerVisible}
+        onDismiss={closeExpenseTypeManager}
+        expenseTypes={expenseTypes}
+        onCreate={handleCreateExpenseType}
+        onUpdate={handleUpdateExpenseType}
+        onDelete={handleDeleteExpenseType}
+      />
     </SafeAreaView>
   );
 };
@@ -713,6 +860,56 @@ const styles = StyleSheet.create({
   categoryBalance: {
     fontSize: 14,
     color: "#666666",
+  },
+  expenseTypeSection: {
+    marginBottom: 16,
+  },
+  expenseTypeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  expenseTypeLabel: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#333333",
+  },
+  expenseTypeManageButton: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  expenseTypeManageText: {
+    marginLeft: 4,
+    fontSize: 14,
+    color: colors.expense,
+    fontWeight: "600",
+  },
+  expenseTypeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  expenseTypeInfo: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  expenseTypeName: {
+    fontSize: 15,
+    color: "#333333",
+    fontWeight: "500",
+  },
+  expenseTypeSpent: {
+    fontSize: 13,
+    color: "#777777",
+  },
+  emptyExpenseType: {
+    paddingVertical: 8,
+  },
+  emptyExpenseTypeText: {
+    fontSize: 14,
+    color: "#666666",
+    marginBottom: 8,
   },
   modalActions: {
     flexDirection: "row",

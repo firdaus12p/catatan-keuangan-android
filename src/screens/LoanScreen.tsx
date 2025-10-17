@@ -600,6 +600,12 @@ export const LoanScreen: React.FC = () => {
         ListHeaderComponent={headerComponent}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        // ✅ OPTIMIZED: FlatList performance props
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
+        initialNumToRender={10}
+        updateCellsBatchingPeriod={50}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <MaterialIcons name="handshake" size={64} color="#CCCCCC" />

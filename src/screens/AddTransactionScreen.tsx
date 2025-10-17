@@ -30,6 +30,10 @@ import { useApp } from "../context/AppContext";
 import { Transaction } from "../db/database";
 import { colors } from "../styles/commonStyles";
 import {
+  getAllocationDeficit,
+  isAllocationComplete,
+} from "../utils/allocation";
+import {
   formatDate,
   getCurrentMonthYear,
   getMonthName,
@@ -40,10 +44,6 @@ import {
   formatNumberInput,
   parseNumberInput,
 } from "../utils/formatCurrency";
-import {
-  getAllocationDeficit,
-  isAllocationComplete,
-} from "../utils/allocation";
 
 export const AddTransactionScreen: React.FC = () => {
   const {
@@ -533,6 +533,12 @@ export const AddTransactionScreen: React.FC = () => {
         ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        // ✅ OPTIMIZED: FlatList performance props
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
+        initialNumToRender={10}
+        updateCellsBatchingPeriod={50}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <MaterialIcons name="receipt-long" size={64} color="#CCCCCC" />

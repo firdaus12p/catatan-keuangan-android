@@ -46,6 +46,9 @@ interface AppContextType {
     amount: number
   ) => Promise<void>;
 
+  // Optimized data loading
+  loadAllData: (limit?: number, offset?: number) => Promise<void>;
+
   // Expense Types
   expenseTypes: ExpenseType[];
   loadExpenseTypes: () => Promise<void>;
@@ -334,7 +337,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           transactionDate.getMonth() === now.getMonth() &&
           transactionDate.getFullYear() === now.getFullYear()
         ) {
-          refreshTasks.push(loadMonthlyStats(now.getFullYear(), now.getMonth() + 1));
+          refreshTasks.push(
+            loadMonthlyStats(now.getFullYear(), now.getMonth() + 1)
+          );
         }
 
         await Promise.all(refreshTasks);
@@ -347,7 +352,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   );
 
   const addGlobalIncome = useCallback(
-    async (amount: number, note: string = "Pemasukan Global"): Promise<void> => {
+    async (
+      amount: number,
+      note: string = "Pemasukan Global"
+    ): Promise<void> => {
       try {
         await database.addGlobalIncome(amount, note);
         const now = new Date();
@@ -374,13 +382,38 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // ✅ OPTIMIZED: Load all data in parallel for better performance
+  const loadAllData = useCallback(
+    async (limit: number = 50, offset: number = 0): Promise<void> => {
+      setLoading(true);
+      try {
+        const [categoriesData, transactionsData, loansData, expenseTypesData] =
+          await Promise.all([
+            database.getAllCategories(),
+            database.getTransactions(limit, offset),
+            database.getAllLoans(),
+            database.getExpenseTypes(),
+          ]);
+
+        setCategories(categoriesData);
+        setTransactions(transactionsData);
+        setLoans(loansData);
+        setExpenseTypes(expenseTypesData);
+      } catch (error) {
+        console.error("Error loading all data:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   const addLoan = useCallback(
     async (loan: Omit<Loan, "id">): Promise<void> => {
       try {
         await database.addLoan(loan);
-        await loadLoans(); // Refresh data
-        await loadCategories(); // Refresh categories untuk update saldo
-        await loadTransactions(); // Refresh transactions untuk update riwayat
+        // ✅ OPTIMIZED: Parallel data refresh
+        await Promise.all([loadLoans(), loadCategories(), loadTransactions()]);
       } catch (error) {
         console.error("Error adding loan:", error);
         throw error;
@@ -397,9 +430,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     ): Promise<void> => {
       try {
         await database.updateLoanStatus(id, status, repaymentAmount);
-        await loadLoans(); // Refresh data
-        await loadCategories(); // Refresh categories untuk update saldo
-        await loadTransactions(); // Refresh transactions untuk update riwayat
+        // ✅ OPTIMIZED: Parallel data refresh
+        await Promise.all([loadLoans(), loadCategories(), loadTransactions()]);
       } catch (error) {
         console.error("Error updating loan status:", error);
         throw error;
@@ -412,8 +444,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     async (id: number): Promise<void> => {
       try {
         await database.deleteLoan(id);
-        await loadLoans(); // Refresh data
-        await loadCategories(); // Update saldo kategori
+        // ✅ OPTIMIZED: Parallel data refresh
+        await Promise.all([loadLoans(), loadCategories()]);
       } catch (error) {
         console.error("Error deleting loan:", error);
         throw error;
@@ -448,12 +480,22 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       ]);
       setMonthlyStats(createEmptyStats());
     });
-  }, [loadCategories, loadExpenseTypes, loadLoans, loadTransactions, runWithLoading]);
+  }, [
+    loadCategories,
+    loadExpenseTypes,
+    loadLoans,
+    loadTransactions,
+    runWithLoading,
+  ]);
 
   const resetTransactions = useCallback(async (): Promise<void> => {
     await runWithLoading(async () => {
       await database.resetTransactions();
-      await Promise.all([loadCategories(), loadTransactions(), loadExpenseTypes()]);
+      await Promise.all([
+        loadCategories(),
+        loadTransactions(),
+        loadExpenseTypes(),
+      ]);
       setMonthlyStats(createEmptyStats());
     });
   }, [loadCategories, loadExpenseTypes, loadTransactions, runWithLoading]);
@@ -543,6 +585,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       deleteCategory,
       transferCategoryBalance,
 
+      // Optimized data loading
+      loadAllData,
+
       // Expense Types
       expenseTypes,
       loadExpenseTypes,
@@ -606,6 +651,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       getLoanPayments,
       handleInitializeNotifications,
       initializeApp,
+      loadAllData,
       loadCategories,
       loadExpenseTypes,
       loadLoans,

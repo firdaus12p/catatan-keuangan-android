@@ -1,15 +1,22 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, InteractionManager, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  InteractionManager,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
   Button,
   Divider,
-  RadioButton,
   Modal,
   Portal,
+  RadioButton,
   Surface,
   TextInput,
 } from "react-native-paper";
@@ -108,9 +115,7 @@ export const CategoryScreen: React.FC = () => {
 
   const openTransferModal = (category: Category) => {
     setTransferSourceCategory(category);
-    const defaultTarget = categories.find(
-      (cat) => cat.id !== category.id
-    );
+    const defaultTarget = categories.find((cat) => cat.id !== category.id);
     setTransferTargetId(defaultTarget?.id?.toString() ?? "");
     setTransferAmount("");
     setTransferModalVisible(true);
@@ -334,6 +339,12 @@ export const CategoryScreen: React.FC = () => {
         ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        // ✅ OPTIMIZED: FlatList performance props
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={true}
+        initialNumToRender={8}
+        updateCellsBatchingPeriod={50}
       />
 
       <Portal>
@@ -380,7 +391,9 @@ export const CategoryScreen: React.FC = () => {
                   <View key={target.id} style={styles.transferTargetItem}>
                     <RadioButton value={target.id!.toString()} />
                     <View style={styles.transferTargetInfo}>
-                      <Text style={styles.transferTargetName}>{target.name}</Text>
+                      <Text style={styles.transferTargetName}>
+                        {target.name}
+                      </Text>
                       <Text style={styles.transferTargetBalance}>
                         Saldo: {formatCurrency(target.balance)}
                       </Text>

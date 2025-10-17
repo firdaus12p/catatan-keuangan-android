@@ -679,6 +679,51 @@ class Database {
     }
   }
 
+  async getExpenseTypeTotalsByMonth(
+    year: number,
+    month: number
+  ): Promise<ExpenseType[]> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      const monthStr = month.toString().padStart(2, "0");
+      const yearStr = year.toString();
+
+      return await this.db.getAllAsync(
+        `
+        SELECT
+          et.id,
+          et.name,
+          COALESCE(SUM(t.amount), 0) AS total_spent
+        FROM expense_types et
+        LEFT JOIN transactions t
+          ON t.expense_type_id = et.id
+          AND t.type = 'expense'
+          AND strftime('%Y', t.date) = ?
+          AND strftime('%m', t.date) = ?
+        GROUP BY et.id, et.name
+        ORDER BY total_spent DESC, et.name ASC
+      `,
+        [yearStr, monthStr]
+      );
+    } catch (error) {
+      console.error("Error getting expense type totals by month:", error);
+      throw error;
+    }
+  }
+
+  async getTotalIncome(): Promise<number> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      const result = (await this.db.getFirstAsync(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = "income"'
+      )) as { total: number };
+      return result.total;
+    } catch (error) {
+      console.error("Error getting total income:", error);
+      throw error;
+    }
+  }
+
   // Loan Payment History methods
   async getLoanPayments(loanId: number): Promise<LoanPayment[]> {
     if (!this.db) throw new Error("Database not initialized");

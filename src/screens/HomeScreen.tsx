@@ -16,6 +16,7 @@ import { Appbar, Card, Chip, ProgressBar } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
 import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
+import { ExpenseType } from "../db/database";
 import { colors } from "../styles/commonStyles";
 import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
 import { formatCurrency } from "../utils/formatCurrency";
@@ -27,13 +28,14 @@ export const HomeScreen: React.FC = () => {
   const {
     categories,
     monthlyStats,
-    expenseTypes,
     loadCategories,
     loadMonthlyStats,
-    loadExpenseTypes,
     addExpenseType,
     updateExpenseType,
     deleteExpenseType,
+    getExpenseTypeTotalsByMonth,
+    loadExpenseTypes,
+    expenseTypes,
     initializeApp,
   } = useApp();
 
@@ -45,6 +47,32 @@ export const HomeScreen: React.FC = () => {
   const [showCategorySelector, setShowCategorySelector] = useState(false);
   const [expenseTypeManagerVisible, setExpenseTypeManagerVisible] =
     useState(false);
+  const [expenseTypeBreakdown, setExpenseTypeBreakdown] = useState<
+    ExpenseType[]
+  >([]);
+
+  const resolvePeriodDate = useCallback((period: "current" | "previous") => {
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+
+    if (period === "current") {
+      return { month: currentMonth, year: currentYear };
+    }
+
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    return { month: prevMonth, year: prevYear };
+  }, []);
+
+  const refreshExpenseBreakdown = useCallback(
+    async (period: "current" | "previous") => {
+      const { month, year } = resolvePeriodDate(period);
+      const breakdown = await getExpenseTypeTotalsByMonth(year, month);
+      setExpenseTypeBreakdown(breakdown);
+    },
+    [getExpenseTypeTotalsByMonth, resolvePeriodDate]
+  );
 
   // Initialize app dan load data
   useFocusEffect(
@@ -57,23 +85,24 @@ export const HomeScreen: React.FC = () => {
           await loadCategories();
           await loadExpenseTypes();
 
-          // Load stats berdasarkan periode yang dipilih
-          const now = new Date();
-          const currentMonth = now.getMonth() + 1;
-          const currentYear = now.getFullYear();
-
-          if (selectedPeriod === "current") {
-            await loadMonthlyStats(currentYear, currentMonth);
-          } else {
-            const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-            const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-            await loadMonthlyStats(prevYear, prevMonth);
-          }
+          const target = resolvePeriodDate(selectedPeriod);
+          await loadMonthlyStats(target.year, target.month);
         }
+
+        await refreshExpenseBreakdown(selectedPeriod);
       };
 
       initApp();
-    }, [selectedPeriod, isInitialized])
+    }, [
+      initializeApp,
+      isInitialized,
+      loadCategories,
+      loadExpenseTypes,
+      loadMonthlyStats,
+      refreshExpenseBreakdown,
+      resolvePeriodDate,
+      selectedPeriod,
+    ])
   );
 
   // Auto-select top 2 categories with highest balance as default
@@ -98,16 +127,19 @@ export const HomeScreen: React.FC = () => {
 
   const totalExpenseTypeSpent = useMemo(
     () =>
-      expenseTypes.reduce((sum, type) => sum + (type.total_spent ?? 0), 0),
-    [expenseTypes]
+      expenseTypeBreakdown.reduce(
+        (sum, type) => sum + (type.total_spent ?? 0),
+        0
+      ),
+    [expenseTypeBreakdown]
   );
 
   const sortedExpenseTypes = useMemo(
     () =>
-      [...expenseTypes].sort(
+      [...expenseTypeBreakdown].sort(
         (a, b) => (b.total_spent ?? 0) - (a.total_spent ?? 0)
       ),
-    [expenseTypes]
+    [expenseTypeBreakdown]
   );
 
   // Validasi total alokasi sebelum membuka halaman transaksi
@@ -145,22 +177,25 @@ export const HomeScreen: React.FC = () => {
   const handleCreateExpenseType = useCallback(
     async (name: string) => {
       await addExpenseType(name);
+      await refreshExpenseBreakdown(selectedPeriod);
     },
-    [addExpenseType]
+    [addExpenseType, refreshExpenseBreakdown, selectedPeriod]
   );
 
   const handleUpdateExpenseType = useCallback(
     async (id: number, name: string) => {
       await updateExpenseType(id, name);
+      await refreshExpenseBreakdown(selectedPeriod);
     },
-    [updateExpenseType]
+    [refreshExpenseBreakdown, selectedPeriod, updateExpenseType]
   );
 
   const handleDeleteExpenseType = useCallback(
     async (id: number) => {
       await deleteExpenseType(id);
+      await refreshExpenseBreakdown(selectedPeriod);
     },
-    [deleteExpenseType]
+    [deleteExpenseType, refreshExpenseBreakdown, selectedPeriod]
   );
 
   const handleTransactionNavigation = useCallback(
@@ -177,21 +212,15 @@ export const HomeScreen: React.FC = () => {
     [validateAllocation, router]
   );
 
-  const handlePeriodChange = async (period: "current" | "previous") => {
-    setSelectedPeriod(period);
-
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-
-    if (period === "current") {
-      await loadMonthlyStats(currentYear, currentMonth);
-    } else {
-      const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-      const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-      await loadMonthlyStats(prevYear, prevMonth);
-    }
-  };
+  const handlePeriodChange = useCallback(
+    async (period: "current" | "previous") => {
+      setSelectedPeriod(period);
+      const target = resolvePeriodDate(period);
+      await loadMonthlyStats(target.year, target.month);
+      await refreshExpenseBreakdown(period);
+    },
+    [loadMonthlyStats, refreshExpenseBreakdown, resolvePeriodDate]
+  );
 
   // Data untuk chart
   const { month, year } = getCurrentMonthYear();

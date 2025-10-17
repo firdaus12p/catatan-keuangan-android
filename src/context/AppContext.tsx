@@ -3,6 +3,7 @@ import React, {
   ReactNode,
   useCallback,
   useContext,
+  useMemo,
   useState,
 } from "react";
 import {
@@ -14,6 +15,22 @@ import {
   Transaction,
 } from "../db/database";
 import { initializeNotifications } from "../utils/notificationHelper";
+
+type MonthlyStats = {
+  totalIncome: number;
+  totalExpense: number;
+  totalSaldo: number;
+  saldoBersih: number;
+  totalOutstandingLoans: number;
+};
+
+const createEmptyStats = (): MonthlyStats => ({
+  totalIncome: 0,
+  totalExpense: 0,
+  totalSaldo: 0,
+  saldoBersih: 0,
+  totalOutstandingLoans: 0,
+});
 
 // Interface untuk Context
 interface AppContextType {
@@ -30,6 +47,10 @@ interface AppContextType {
   addExpenseType: (name: string) => Promise<number>;
   updateExpenseType: (id: number, name: string) => Promise<void>;
   deleteExpenseType: (id: number) => Promise<void>;
+  getExpenseTypeTotalsByMonth: (
+    year: number,
+    month: number
+  ) => Promise<ExpenseType[]>;
 
   // Transactions
   transactions: Transaction[];
@@ -55,13 +76,7 @@ interface AppContextType {
   initializeNotifications: () => Promise<void>;
 
   // Statistics
-  monthlyStats: {
-    totalIncome: number;
-    totalExpense: number;
-    totalSaldo: number; // Total pemasukan yang tercatat bulan ini
-    saldoBersih: number; // Saldo yang tersedia saat ini (dipengaruhi pinjaman)
-    totalOutstandingLoans: number; // Total pinjaman yang belum lunas
-  };
+  monthlyStats: MonthlyStats;
   totalAllTimeBalance: number; // Total pemasukan kumulatif semua bulan
   loadMonthlyStats: (year: number, month: number) => Promise<void>;
   loadTotalAllTimeBalance: () => Promise<void>;
@@ -95,90 +110,72 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
-  const [monthlyStats, setMonthlyStats] = useState({
-    totalIncome: 0,
-    totalExpense: 0,
-    totalSaldo: 0, // Total pemasukan yang tercatat bulan ini
-    saldoBersih: 0, // Saldo yang tersedia saat ini (dipengaruhi pinjaman)
-    totalOutstandingLoans: 0, // Total pinjaman yang belum lunas
-  });
+  const [monthlyStats, setMonthlyStats] = useState<MonthlyStats>(
+    createEmptyStats()
+  );
   const [totalAllTimeBalance, setTotalAllTimeBalance] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Helper function untuk membuat empty stats
-  const createEmptyStats = () => ({
-    totalIncome: 0,
-    totalExpense: 0,
-    totalSaldo: 0,
-    saldoBersih: 0,
-    totalOutstandingLoans: 0,
-  });
-
-  // Initialize database dan load data awal
-  const initializeApp = useCallback(async (): Promise<void> => {
-    try {
+  const runWithLoading = useCallback(
+    async (task: () => Promise<void>): Promise<void> => {
       setLoading(true);
-      await database.initializeDatabase();
-      await loadCategories();
-      await loadTransactions();
-      await loadExpenseTypes();
-      await loadLoans();
-
-      // Load statistik bulan ini
-      const now = new Date();
-      await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
-
-      // Initialize notifications
-      await handleInitializeNotifications();
-    } catch (error) {
-      console.error("Error initializing app:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      try {
+        await task();
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   // Categories methods
-  const loadCategories = async (): Promise<void> => {
+  const loadCategories = useCallback(async (): Promise<void> => {
     try {
       const data = await database.getAllCategories();
       setCategories(data);
     } catch (error) {
       console.error("Error loading categories:", error);
     }
-  };
+  }, []);
 
-  const addCategory = async (category: Omit<Category, "id">): Promise<void> => {
-    try {
-      await database.addCategory(category);
-      await loadCategories(); // Refresh data
-    } catch (error) {
-      console.error("Error adding category:", error);
-      throw error;
-    }
-  };
+  const addCategory = useCallback(
+    async (category: Omit<Category, "id">): Promise<void> => {
+      try {
+        await database.addCategory(category);
+        await loadCategories(); // Refresh data
+      } catch (error) {
+        console.error("Error adding category:", error);
+        throw error;
+      }
+    },
+    [loadCategories]
+  );
 
-  const updateCategory = async (
-    id: number,
-    category: Omit<Category, "id">
-  ): Promise<void> => {
-    try {
-      await database.updateCategory(id, category);
-      await loadCategories(); // Refresh data
-    } catch (error) {
-      console.error("Error updating category:", error);
-      throw error;
-    }
-  };
+  const updateCategory = useCallback(
+    async (id: number, category: Omit<Category, "id">): Promise<void> => {
+      try {
+        await database.updateCategory(id, category);
+        await loadCategories(); // Refresh data
+      } catch (error) {
+        console.error("Error updating category:", error);
+        throw error;
+      }
+    },
+    [loadCategories]
+  );
 
-  const deleteCategory = async (id: number): Promise<void> => {
-    try {
-      await database.deleteCategory(id);
-      await loadCategories(); // Refresh data
-    } catch (error) {
-      console.error("Error deleting category:", error);
-      throw error;
-    }
-  };
+  const deleteCategory = useCallback(
+    async (id: number): Promise<void> => {
+      try {
+        await database.deleteCategory(id);
+        await loadCategories(); // Refresh data
+      } catch (error) {
+        console.error("Error deleting category:", error);
+        throw error;
+      }
+    },
+    [loadCategories]
+  );
 
   // Expense Types methods
   const loadExpenseTypes = useCallback(async (): Promise<void> => {
@@ -189,6 +186,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       console.error("Error loading expense types:", error);
     }
   }, []);
+
+  const getExpenseTypeTotalsByMonth = useCallback(
+    async (year: number, month: number): Promise<ExpenseType[]> => {
+      try {
+        return await database.getExpenseTypeTotalsByMonth(year, month);
+      } catch (error) {
+        console.error("Error getting expense type totals by month:", error);
+        throw error;
+      }
+    },
+    []
+  );
 
   const addExpenseType = useCallback(
     async (name: string): Promise<number> => {
@@ -231,328 +240,362 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   );
 
   // Transactions methods
-  const loadTransactions = async (
-    limit: number = 50,
-    offset: number = 0
-  ): Promise<void> => {
-    try {
-      const data = await database.getTransactions(limit, offset);
-      setTransactions(data);
-    } catch (error) {
-      console.error("Error loading transactions:", error);
-    }
-  };
-
-  const addTransaction = async (
-    transaction: Omit<Transaction, "id">
-  ): Promise<void> => {
-    try {
-      await database.addTransaction(transaction);
-      await loadTransactions(); // Refresh data
-      await loadCategories(); // Refresh categories untuk update saldo
-      await loadExpenseTypes(); // Refresh jenis pengeluaran
-
-      // Refresh statistik jika transaksi bulan ini
-      const transactionDate = new Date(transaction.date);
-      const now = new Date();
-      if (
-        transactionDate.getMonth() === now.getMonth() &&
-        transactionDate.getFullYear() === now.getFullYear()
-      ) {
-        await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+  const loadTransactions = useCallback(
+    async (limit: number = 50, offset: number = 0): Promise<void> => {
+      try {
+        const data = await database.getTransactions(limit, offset);
+        setTransactions(data);
+      } catch (error) {
+        console.error("Error loading transactions:", error);
       }
-    } catch (error) {
-      console.error("Error adding transaction:", error);
-      throw error;
-    }
-  };
+    },
+    []
+  );
 
-  const addGlobalIncome = async (
-    amount: number,
-    note: string = "Pemasukan Global"
-  ): Promise<void> => {
+  const loadMonthlyStats = useCallback(
+    async (year: number, month: number): Promise<void> => {
+      try {
+        const [stats, currentLoans, categoriesData] = await Promise.all([
+          database.getMonthlyStats(year, month),
+          database.getAllLoans(),
+          database.getAllCategories(),
+        ]);
+
+        const totalOutstandingLoans = currentLoans
+          .filter((loan) => loan.status !== "paid")
+          .reduce((sum, loan) => sum + loan.amount, 0);
+
+        const totalCategoryBalance = categoriesData.reduce(
+          (sum: number, cat: Category) => sum + cat.balance,
+          0
+        );
+
+        setMonthlyStats({
+          ...stats,
+          totalSaldo: stats.totalIncome,
+          saldoBersih: totalCategoryBalance,
+          totalOutstandingLoans,
+        });
+      } catch (error) {
+        console.error("Error loading monthly stats:", error);
+      }
+    },
+    []
+  );
+
+  const loadTotalAllTimeBalance = useCallback(async (): Promise<void> => {
     try {
-      await database.addGlobalIncome(amount, note);
-      await loadTransactions(); // Refresh data
-      await loadCategories(); // Refresh categories untuk update saldo
-
-      // Refresh statistik bulan ini
-      const now = new Date();
-      await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+      const totalIncome = await database.getTotalIncome();
+      setTotalAllTimeBalance(totalIncome);
     } catch (error) {
-      console.error("Error adding global income:", error);
-      throw error;
+      console.error("Error loading total all-time balance:", error);
     }
-  };
+  }, []);
+
+  const addTransaction = useCallback(
+    async (transaction: Omit<Transaction, "id">): Promise<void> => {
+      try {
+        await database.addTransaction(transaction);
+        await loadTransactions(); // Refresh data
+        await loadCategories(); // Refresh categories untuk update saldo
+        await loadExpenseTypes(); // Refresh jenis pengeluaran
+
+        // Refresh statistik jika transaksi bulan ini
+        const transactionDate = new Date(transaction.date);
+        const now = new Date();
+        if (
+          transactionDate.getMonth() === now.getMonth() &&
+          transactionDate.getFullYear() === now.getFullYear()
+        ) {
+          await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+        }
+      } catch (error) {
+        console.error("Error adding transaction:", error);
+        throw error;
+      }
+    },
+    [loadCategories, loadExpenseTypes, loadMonthlyStats, loadTransactions]
+  );
+
+  const addGlobalIncome = useCallback(
+    async (amount: number, note: string = "Pemasukan Global"): Promise<void> => {
+      try {
+        await database.addGlobalIncome(amount, note);
+        await loadTransactions(); // Refresh data
+        await loadCategories(); // Refresh categories untuk update saldo
+
+        // Refresh statistik bulan ini
+        const now = new Date();
+        await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+      } catch (error) {
+        console.error("Error adding global income:", error);
+        throw error;
+      }
+    },
+    [loadCategories, loadMonthlyStats, loadTransactions]
+  );
 
   // Loans methods
-  const loadLoans = async (): Promise<void> => {
+  const loadLoans = useCallback(async (): Promise<void> => {
     try {
       const data = await database.getAllLoans();
       setLoans(data);
     } catch (error) {
       console.error("Error loading loans:", error);
     }
-  };
+  }, []);
 
-  const addLoan = async (loan: Omit<Loan, "id">): Promise<void> => {
-    try {
-      await database.addLoan(loan);
-      await loadLoans(); // Refresh data
-      await loadCategories(); // Refresh categories untuk update saldo
-      await loadTransactions(); // Refresh transactions untuk update riwayat
-    } catch (error) {
-      console.error("Error adding loan:", error);
-      throw error;
-    }
-  };
+  const addLoan = useCallback(
+    async (loan: Omit<Loan, "id">): Promise<void> => {
+      try {
+        await database.addLoan(loan);
+        await loadLoans(); // Refresh data
+        await loadCategories(); // Refresh categories untuk update saldo
+        await loadTransactions(); // Refresh transactions untuk update riwayat
+      } catch (error) {
+        console.error("Error adding loan:", error);
+        throw error;
+      }
+    },
+    [loadCategories, loadLoans, loadTransactions]
+  );
 
-  const updateLoanStatus = async (
-    id: number,
-    status: "unpaid" | "half" | "paid",
-    repaymentAmount?: number
-  ): Promise<void> => {
-    try {
-      await database.updateLoanStatus(id, status, repaymentAmount);
-      await loadLoans(); // Refresh data
-      await loadCategories(); // Refresh categories untuk update saldo
-      await loadTransactions(); // Refresh transactions untuk update riwayat
-    } catch (error) {
-      console.error("Error updating loan status:", error);
-      throw error;
-    }
-  };
+  const updateLoanStatus = useCallback(
+    async (
+      id: number,
+      status: "unpaid" | "half" | "paid",
+      repaymentAmount?: number
+    ): Promise<void> => {
+      try {
+        await database.updateLoanStatus(id, status, repaymentAmount);
+        await loadLoans(); // Refresh data
+        await loadCategories(); // Refresh categories untuk update saldo
+        await loadTransactions(); // Refresh transactions untuk update riwayat
+      } catch (error) {
+        console.error("Error updating loan status:", error);
+        throw error;
+      }
+    },
+    [loadCategories, loadLoans, loadTransactions]
+  );
 
-  const deleteLoan = async (id: number): Promise<void> => {
-    try {
-      await database.deleteLoan(id);
-      await loadLoans(); // Refresh data
-    } catch (error) {
-      console.error("Error deleting loan:", error);
-      throw error;
-    }
-  };
+  const deleteLoan = useCallback(
+    async (id: number): Promise<void> => {
+      try {
+        await database.deleteLoan(id);
+        await loadLoans(); // Refresh data
+        await loadCategories(); // Update saldo kategori
+      } catch (error) {
+        console.error("Error deleting loan:", error);
+        throw error;
+      }
+    },
+    [loadCategories, loadLoans]
+  );
 
   // Loan Payments methods
-  const getLoanPayments = async (loanId: number): Promise<LoanPayment[]> => {
-    try {
-      return await database.getLoanPayments(loanId);
-    } catch (error) {
-      console.error("Error getting loan payments:", error);
-      throw error;
-    }
-  };
+  const getLoanPayments = useCallback(
+    async (loanId: number): Promise<LoanPayment[]> => {
+      try {
+        return await database.getLoanPayments(loanId);
+      } catch (error) {
+        console.error("Error getting loan payments:", error);
+        throw error;
+      }
+    },
+    []
+  );
 
   // Statistics methods
-  const loadMonthlyStats = async (
-    year: number,
-    month: number
-  ): Promise<void> => {
-    try {
-      const stats = await database.getMonthlyStats(year, month);
-      // Total Saldo = hanya total pemasukan yang tercatat (bukan income - expense)
-      const totalSaldo = stats.totalIncome;
-
-      // Calculate total outstanding loans
-      const currentLoans = await database.getAllLoans();
-      const totalOutstandingLoans = currentLoans
-        .filter((loan) => loan.status !== "paid")
-        .reduce((sum, loan) => sum + loan.amount, 0);
-
-      // Saldo Bersih = saldo yang tersedia saat ini
-      // Dihitung dari total semua kategori balance (yang sudah terpengaruh operasi pinjaman)
-      const categories = await database.getAllCategories();
-      const totalCategoryBalance = categories.reduce(
-        (sum: number, cat: Category) => sum + cat.balance,
-        0
-      );
-      const saldoBersih = totalCategoryBalance;
-
-      setMonthlyStats({
-        ...stats,
-        totalSaldo,
-        saldoBersih,
-        totalOutstandingLoans,
-      });
-    } catch (error) {
-      console.error("Error loading monthly stats:", error);
-    }
-  };
-
-  const loadTotalAllTimeBalance = async (): Promise<void> => {
-    try {
-      // Total All-Time Balance = hanya total pemasukan semua bulan
-      // Bukan pemasukan - pengeluaran, sesuai dengan konsep Total Saldo
-      const allTransactions = await database.getTransactions(999999, 0);
-      const totalAllTimeIncome = allTransactions
-        .filter((t: Transaction) => t.type === "income")
-        .reduce((sum: number, t: Transaction) => sum + t.amount, 0);
-
-      setTotalAllTimeBalance(totalAllTimeIncome);
-    } catch (error) {
-      console.error("Error loading total all-time balance:", error);
-    }
-  };
-
   // Reset methods
-  const resetAllData = async (): Promise<void> => {
-    try {
-      setLoading(true);
+  const resetAllData = useCallback(async (): Promise<void> => {
+    await runWithLoading(async () => {
       await database.resetAllData();
-      await loadCategories();
-      await loadTransactions();
-      await loadExpenseTypes();
-      await loadLoans();
+      await Promise.all([
+        loadCategories(),
+        loadTransactions(),
+        loadExpenseTypes(),
+        loadLoans(),
+      ]);
       setMonthlyStats(createEmptyStats());
-    } catch (error) {
-      console.error("Error resetting all data:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
+  }, [loadCategories, loadExpenseTypes, loadLoans, loadTransactions, runWithLoading]);
 
-  const resetTransactions = async (): Promise<void> => {
-    try {
-      setLoading(true);
+  const resetTransactions = useCallback(async (): Promise<void> => {
+    await runWithLoading(async () => {
       await database.resetTransactions();
-      await loadCategories();
-      await loadTransactions();
-      await loadExpenseTypes();
+      await Promise.all([loadCategories(), loadTransactions(), loadExpenseTypes()]);
       setMonthlyStats(createEmptyStats());
-    } catch (error) {
-      console.error("Error resetting transactions:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
+  }, [loadCategories, loadExpenseTypes, loadTransactions, runWithLoading]);
 
-  const resetLoans = async (): Promise<void> => {
-    try {
-      setLoading(true);
+  const resetLoans = useCallback(async (): Promise<void> => {
+    await runWithLoading(async () => {
       await database.resetLoans();
       await loadLoans();
-    } catch (error) {
-      console.error("Error resetting loans:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
+  }, [loadLoans, runWithLoading]);
 
-  const resetCategories = async (): Promise<void> => {
-    try {
-      setLoading(true);
+  const resetCategories = useCallback(async (): Promise<void> => {
+    await runWithLoading(async () => {
       await database.resetCategories();
-      await loadCategories();
-      await loadTransactions();
-      await loadLoans();
+      await Promise.all([loadCategories(), loadTransactions(), loadLoans()]);
       setMonthlyStats(createEmptyStats());
-    } catch (error) {
-      console.error("Error resetting categories:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
+  }, [loadCategories, loadLoans, loadTransactions, runWithLoading]);
 
-  const resetCategoryBalances = async (): Promise<void> => {
-    try {
-      setLoading(true);
+  const resetCategoryBalances = useCallback(async (): Promise<void> => {
+    await runWithLoading(async () => {
       await database.resetCategoryBalances();
       await loadCategories();
       setMonthlyStats(createEmptyStats());
-    } catch (error) {
-      console.error("Error resetting category balances:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
+  }, [loadCategories, runWithLoading]);
 
-  const cleanupLoanTransactions = async (): Promise<void> => {
-    try {
-      setLoading(true);
+  const cleanupLoanTransactions = useCallback(async (): Promise<void> => {
+    await runWithLoading(async () => {
       await database.cleanupLoanTransactions();
-      await loadTransactions();
-      await loadCategories();
-      await loadExpenseTypes();
-      // Reload monthly stats karena transactions berubah
+      await Promise.all([
+        loadTransactions(),
+        loadCategories(),
+        loadExpenseTypes(),
+      ]);
       const now = new Date();
       await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
-    } catch (error) {
-      console.error("Error cleaning up loan transactions:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
+  }, [
+    loadCategories,
+    loadExpenseTypes,
+    loadMonthlyStats,
+    loadTransactions,
+    runWithLoading,
+  ]);
 
   // Initialize notifications saat app pertama kali dibuka
-  const handleInitializeNotifications = async (): Promise<void> => {
+  const handleInitializeNotifications = useCallback(async (): Promise<void> => {
     try {
       await initializeNotifications();
-      // Notifications initialized successfully
     } catch (error) {
       console.error("Error initializing notifications:", error);
     }
-  };
+  }, []);
 
-  const value: AppContextType = {
-    // Categories
-    categories,
+  const initializeApp = useCallback(async (): Promise<void> => {
+    await runWithLoading(async () => {
+      await database.initializeDatabase();
+      await Promise.all([
+        loadCategories(),
+        loadTransactions(),
+        loadExpenseTypes(),
+        loadLoans(),
+      ]);
+
+      const now = new Date();
+      await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+      await handleInitializeNotifications();
+    });
+  }, [
+    handleInitializeNotifications,
     loadCategories,
-    addCategory,
-    updateCategory,
-    deleteCategory,
-
-    // Expense Types
-    expenseTypes,
     loadExpenseTypes,
-    addExpenseType,
-    updateExpenseType,
-    deleteExpenseType,
-
-    // Transactions
-    transactions,
-    loadTransactions,
-    addTransaction,
-    addGlobalIncome,
-
-    // Loans
-    loans,
     loadLoans,
-    addLoan,
-    updateLoanStatus,
-    deleteLoan,
-
-    // Loan Payments
-    getLoanPayments,
-
-    // Notifications
-    initializeNotifications: handleInitializeNotifications,
-
-    // Statistics
-    monthlyStats,
-    totalAllTimeBalance,
     loadMonthlyStats,
-    loadTotalAllTimeBalance,
+    loadTransactions,
+    runWithLoading,
+  ]);
 
-    // Reset functions
-    resetAllData,
-    resetTransactions,
-    resetLoans,
-    resetCategories,
-    resetCategoryBalances,
-    cleanupLoanTransactions,
+  const value = useMemo<AppContextType>(
+    () => ({
+      // Categories
+      categories,
+      loadCategories,
+      addCategory,
+      updateCategory,
+      deleteCategory,
 
-    // Loading state
-    loading,
+      // Expense Types
+      expenseTypes,
+      loadExpenseTypes,
+      addExpenseType,
+      updateExpenseType,
+      deleteExpenseType,
+      getExpenseTypeTotalsByMonth,
 
-    // App initialization
-    initializeApp,
-  };
+      // Transactions
+      transactions,
+      loadTransactions,
+      addTransaction,
+      addGlobalIncome,
+
+      // Loans
+      loans,
+      loadLoans,
+      addLoan,
+      updateLoanStatus,
+      deleteLoan,
+
+      // Loan Payments
+      getLoanPayments,
+
+      // Notifications
+      initializeNotifications: handleInitializeNotifications,
+
+      // Statistics
+      monthlyStats,
+      totalAllTimeBalance,
+      loadMonthlyStats,
+      loadTotalAllTimeBalance,
+
+      // Reset functions
+      resetAllData,
+      resetTransactions,
+      resetLoans,
+      resetCategories,
+      resetCategoryBalances,
+      cleanupLoanTransactions,
+
+      // Loading state
+      loading,
+
+      // App initialization
+      initializeApp,
+    }),
+    [
+      addCategory,
+      addExpenseType,
+      addGlobalIncome,
+      addLoan,
+      addTransaction,
+      categories,
+      cleanupLoanTransactions,
+      deleteCategory,
+      deleteExpenseType,
+      deleteLoan,
+      getExpenseTypeTotalsByMonth,
+      expenseTypes,
+      getLoanPayments,
+      handleInitializeNotifications,
+      initializeApp,
+      loadCategories,
+      loadExpenseTypes,
+      loadLoans,
+      loadMonthlyStats,
+      loadTotalAllTimeBalance,
+      loadTransactions,
+      loans,
+      loading,
+      monthlyStats,
+      resetAllData,
+      resetCategories,
+      resetCategoryBalances,
+      resetLoans,
+      resetTransactions,
+      totalAllTimeBalance,
+      updateCategory,
+      updateExpenseType,
+      updateLoanStatus,
+    ]
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

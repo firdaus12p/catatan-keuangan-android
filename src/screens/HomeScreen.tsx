@@ -16,7 +16,6 @@ import { Appbar, Card, Chip, ProgressBar } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
 import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
-import { ExpenseType } from "../db/database";
 import { colors } from "../styles/commonStyles";
 import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
 import { formatCurrency } from "../utils/formatCurrency";
@@ -99,30 +98,17 @@ export const HomeScreen: React.FC = () => {
 
   const totalExpenseTypeSpent = useMemo(
     () =>
-      expenseTypes.reduce(
-        (sum, type) => sum + (type.total_spent ?? 0),
-        0
+      expenseTypes.reduce((sum, type) => sum + (type.total_spent ?? 0), 0),
+    [expenseTypes]
+  );
+
+  const sortedExpenseTypes = useMemo(
+    () =>
+      [...expenseTypes].sort(
+        (a, b) => (b.total_spent ?? 0) - (a.total_spent ?? 0)
       ),
     [expenseTypes]
   );
-
-  const topExpenseType = useMemo<ExpenseType | null>(
-    () =>
-      expenseTypes.reduce<ExpenseType | null>((top, current) => {
-        if (!top || current.total_spent > top.total_spent) {
-          return current;
-        }
-        return top;
-      }, null),
-    [expenseTypes]
-  );
-
-  const topExpensePercentage = useMemo(() => {
-    if (!topExpenseType || totalExpenseTypeSpent <= 0) {
-      return 0;
-    }
-    return topExpenseType.total_spent / totalExpenseTypeSpent;
-  }, [topExpenseType, totalExpenseTypeSpent]);
 
   // Validasi total alokasi sebelum membuka halaman transaksi
   const validateAllocation = useCallback(() => {
@@ -602,28 +588,38 @@ export const HomeScreen: React.FC = () => {
               />
             </TouchableOpacity>
           </View>
-          {topExpenseType && topExpenseType.total_spent > 0 ? (
-            <>
-              <Text style={styles.expenseHighlightName}>
-                {topExpenseType.name}
+          {totalExpenseTypeSpent > 0 ? (
+            <View style={styles.expenseListContainer}>
+              <Text style={styles.expenseSummaryTotal}>
+                Total: {formatCurrency(totalExpenseTypeSpent)}
               </Text>
-              <Text style={styles.expenseHighlightAmount}>
-                {formatCurrency(topExpenseType.total_spent)}
-              </Text>
-              <View style={styles.expenseHighlightMeta}>
-                <Text style={styles.expenseHighlightPercentage}>
-                  {(topExpensePercentage * 100).toFixed(1)}%
-                </Text>
-                <Text style={styles.expenseHighlightTotal}>
-                  dari total {formatCurrency(totalExpenseTypeSpent)}
-                </Text>
-              </View>
-              <ProgressBar
-                progress={Math.min(Math.max(topExpensePercentage, 0), 1)}
-                color={colors.expense}
-                style={styles.expenseHighlightProgress}
-              />
-            </>
+              {sortedExpenseTypes.map((type) => {
+                const amount = type.total_spent ?? 0;
+                const percentage =
+                  totalExpenseTypeSpent > 0 ? amount / totalExpenseTypeSpent : 0;
+
+                return (
+                  <View key={type.id} style={styles.expenseListRow}>
+                    <View style={styles.expenseListItem}>
+                      <View style={styles.expenseListInfo}>
+                        <Text style={styles.expenseListName}>{type.name}</Text>
+                        <Text style={styles.expenseListAmount}>
+                          {formatCurrency(amount)}
+                        </Text>
+                      </View>
+                      <Text style={styles.expenseListPercentage}>
+                        {(percentage * 100).toFixed(1)}%
+                      </Text>
+                    </View>
+                    <ProgressBar
+                      progress={Math.min(Math.max(percentage, 0), 1)}
+                      color={colors.expense}
+                      style={styles.expenseListProgress}
+                    />
+                  </View>
+                );
+              })}
+            </View>
           ) : (
             <View style={styles.expenseHighlightEmpty}>
               <MaterialIcons name="insights" size={48} color="#CCCCCC" />
@@ -825,38 +821,46 @@ const styles = StyleSheet.create({
   expenseHighlightSettings: {
     padding: 4,
   },
-  expenseHighlightName: {
-    fontSize: 16,
+  expenseListContainer: {
+    marginTop: 4,
+  },
+  expenseSummaryTotal: {
+    fontSize: 14,
     fontWeight: "600",
     color: colors.text,
   },
-  expenseHighlightAmount: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.expense,
+  expenseListRow: {
     marginTop: 4,
   },
-  expenseHighlightMeta: {
+  expenseListItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 8,
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  expenseHighlightPercentage: {
-    fontSize: 16,
+  expenseListInfo: {
+    flex: 1,
+  },
+  expenseListName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  expenseListAmount: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  expenseListPercentage: {
+    fontSize: 14,
     fontWeight: "700",
     color: colors.expense,
+    marginLeft: 12,
   },
-  expenseHighlightTotal: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  expenseHighlightProgress: {
-    height: 8,
-    borderRadius: 4,
+  expenseListProgress: {
+    height: 6,
+    borderRadius: 3,
     backgroundColor: "#FFCDD2",
-    marginTop: 8,
   },
   expenseHighlightEmpty: {
     alignItems: "center",

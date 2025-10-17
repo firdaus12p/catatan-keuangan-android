@@ -3,9 +3,9 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Card } from "react-native-paper";
 import { Category, Transaction } from "../db/database";
+import { colors } from "../styles/commonStyles";
 import { formatDate } from "../utils/dateHelper";
 import { formatCurrency } from "../utils/formatCurrency";
-import { colors } from "../styles/commonStyles";
 
 interface TransactionItemProps {
   transaction: Transaction;

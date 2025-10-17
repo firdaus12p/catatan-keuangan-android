@@ -48,6 +48,7 @@ export interface ExpenseType {
 
 class Database {
   private db: SQLite.SQLiteDatabase | null = null;
+  private expenseTypesHasCreatedAtCache: boolean | null = null;
 
   async initializeDatabase(): Promise<void> {
     try {
@@ -81,13 +82,15 @@ class Database {
         CREATE TABLE IF NOT EXISTS expense_types (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,
-          total_spent REAL NOT NULL DEFAULT 0
+          total_spent REAL NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
       `);
 
       // Pastikan kolom relasi jenis pengeluaran tersedia
       await this.ensureTransactionExpenseTypeColumn();
       await this.ensureExpenseTypeTotalsColumn();
+      await this.ensureExpenseTypeCreatedAtColumn();
 
       // Buat tabel loans
       await this.db.execAsync(`
@@ -204,16 +207,40 @@ class Database {
   private async ensureExpenseTypeTotalsColumn(): Promise<void> {
     if (!this.db) throw new Error("Database not initialized");
 
-    const hasColumn = await this.tableHasColumn(
-      "expense_types",
-      "total_spent"
-    );
+    const hasColumn = await this.tableHasColumn("expense_types", "total_spent");
 
     if (!hasColumn) {
       await this.db.execAsync(
         "ALTER TABLE expense_types ADD COLUMN total_spent REAL NOT NULL DEFAULT 0"
       );
     }
+  }
+
+  private async ensureExpenseTypeCreatedAtColumn(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+
+    const hasColumn = await this.tableHasColumn("expense_types", "created_at");
+
+    if (!hasColumn) {
+      await this.db.execAsync(
+        "ALTER TABLE expense_types ADD COLUMN created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+      );
+    }
+
+    this.expenseTypesHasCreatedAtCache = true;
+  }
+
+  private async expenseTypesHasCreatedAt(): Promise<boolean> {
+    if (!this.db) throw new Error("Database not initialized");
+
+    if (this.expenseTypesHasCreatedAtCache === null) {
+      this.expenseTypesHasCreatedAtCache = await this.tableHasColumn(
+        "expense_types",
+        "created_at"
+      );
+    }
+
+    return this.expenseTypesHasCreatedAtCache;
   }
 
   private async insertDefaultExpenseTypes(): Promise<void> {
@@ -236,16 +263,30 @@ class Database {
         ];
 
         for (const typeName of defaultTypes) {
-          await this.db.runAsync(
-            "INSERT INTO expense_types (name, total_spent) VALUES (?, ?)",
-            [typeName, 0]
-          );
+          await this.insertExpenseTypeRow(typeName, 0);
         }
       }
     } catch (error) {
       console.error("Error inserting default expense types:", error);
       throw error;
     }
+  }
+
+  private async insertExpenseTypeRow(
+    name: string,
+    totalSpent: number
+  ): Promise<number> {
+    if (!this.db) throw new Error("Database not initialized");
+
+    const hasCreatedAt = await this.expenseTypesHasCreatedAt();
+    const now = new Date().toISOString();
+    const query = hasCreatedAt
+      ? "INSERT INTO expense_types (name, total_spent, created_at) VALUES (?, ?, ?)"
+      : "INSERT INTO expense_types (name, total_spent) VALUES (?, ?)";
+    const params = hasCreatedAt ? [name, totalSpent, now] : [name, totalSpent];
+
+    const result = await this.db.runAsync(query, params);
+    return result.lastInsertRowId;
   }
 
   // CRUD untuk Categories
@@ -305,6 +346,7 @@ class Database {
   async getExpenseTypes(): Promise<ExpenseType[]> {
     if (!this.db) throw new Error("Database not initialized");
     try {
+      await this.ensureExpenseTypeCreatedAtColumn();
       await this.ensureExpenseTypeTotalsColumn();
       await this.recalculateExpenseTypeTotals();
       return await this.db.getAllAsync(
@@ -319,11 +361,7 @@ class Database {
   async addExpenseType(name: string): Promise<number> {
     if (!this.db) throw new Error("Database not initialized");
     try {
-      const result = await this.db.runAsync(
-        "INSERT INTO expense_types (name, total_spent) VALUES (?, 0)",
-        [name.trim()]
-      );
-      return result.lastInsertRowId;
+      return await this.insertExpenseTypeRow(name.trim(), 0);
     } catch (error) {
       console.error("Error adding expense type:", error);
       throw error;

@@ -23,14 +23,7 @@ interface ExpenseTypeManagerModalProps {
 
 export const ExpenseTypeManagerModal: React.FC<
   ExpenseTypeManagerModalProps
-> = ({
-  visible,
-  onDismiss,
-  expenseTypes,
-  onCreate,
-  onUpdate,
-  onDelete,
-}) => {
+> = ({ visible, onDismiss, expenseTypes, onCreate, onUpdate, onDelete }) => {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -62,7 +55,7 @@ export const ExpenseTypeManagerModal: React.FC<
 
     const trimmedName = name.trim();
     if (!trimmedName) {
-      Alert.alert("Validasi", "Nama jenis pengeluaran tidak boleh kosong.");
+      Alert.alert("Maaf", "Nama jenis pengeluaran tidak boleh kosong.");
       return;
     }
 
@@ -97,31 +90,27 @@ export const ExpenseTypeManagerModal: React.FC<
     (type: ExpenseType) => {
       if (!type.id || submitting) return;
 
-      Alert.alert(
-        "Hapus Jenis",
-        `Anda yakin ingin menghapus "${type.name}"?`,
-        [
-          { text: "Batal", style: "cancel" },
-          {
-            text: "Hapus",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                setSubmitting(true);
-                await onDelete(type.id!);
-                if (editingId === type.id) {
-                  resetForm();
-                }
-              } catch (error) {
-                console.error("Error deleting expense type:", error);
-                Alert.alert("Error", "Gagal menghapus jenis pengeluaran.");
-              } finally {
-                setSubmitting(false);
+      Alert.alert("Hapus Jenis", `Anda yakin ingin menghapus "${type.name}"?`, [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Hapus",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setSubmitting(true);
+              await onDelete(type.id!);
+              if (editingId === type.id) {
+                resetForm();
               }
-            },
+            } catch (error) {
+              console.error("Error deleting expense type:", error);
+              Alert.alert("Error", "Gagal menghapus jenis pengeluaran.");
+            } finally {
+              setSubmitting(false);
+            }
           },
-        ]
-      );
+        },
+      ]);
     },
     [onDelete, submitting, editingId, resetForm]
   );

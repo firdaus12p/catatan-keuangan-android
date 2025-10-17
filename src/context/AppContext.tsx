@@ -250,7 +250,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       await database.addTransaction(transaction);
       await loadTransactions(); // Refresh data
       await loadCategories(); // Refresh categories untuk update saldo
-       await loadExpenseTypes(); // Refresh jenis pengeluaran
+      await loadExpenseTypes(); // Refresh jenis pengeluaran
 
       // Refresh statistik jika transaksi bulan ini
       const transactionDate = new Date(transaction.date);

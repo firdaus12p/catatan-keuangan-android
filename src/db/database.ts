@@ -707,19 +707,19 @@ class Database {
       const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
       const endDate = `${year}-${month.toString().padStart(2, "0")}-31`;
 
-      const incomeResult = (await this.db.getFirstAsync(
-        'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = "income" AND date BETWEEN ? AND ?',
+      // Optimized: Gabung 2 query jadi 1 dengan conditional SUM
+      const result = (await this.db.getFirstAsync(
+        `SELECT 
+          COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as totalIncome,
+          COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as totalExpense
+        FROM transactions 
+        WHERE date BETWEEN ? AND ?`,
         [startDate, endDate]
-      )) as { total: number };
-
-      const expenseResult = (await this.db.getFirstAsync(
-        'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = "expense" AND date BETWEEN ? AND ?',
-        [startDate, endDate]
-      )) as { total: number };
+      )) as { totalIncome: number; totalExpense: number };
 
       return {
-        totalIncome: incomeResult.total,
-        totalExpense: expenseResult.total,
+        totalIncome: result.totalIncome,
+        totalExpense: result.totalExpense,
       };
     } catch (error) {
       console.error("Error getting monthly stats:", error);

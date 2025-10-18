@@ -4,11 +4,17 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "start:clean": "expo start --clear",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
+    "android:build": "expo run:android",
+    "android:release": "expo run:android --variant release",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "type-check": "tsc --noEmit",
+    "prebuild": "expo prebuild",
+    "prebuild:clean": "expo prebuild --clean"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

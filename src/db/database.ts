@@ -342,6 +342,54 @@ class Database {
     }
   }
 
+  async transferCategoryBalance(
+    sourceCategoryId: number,
+    targetCategoryId: number,
+    amount: number
+  ): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    if (sourceCategoryId === targetCategoryId) {
+      throw new Error("Kategori sumber dan tujuan tidak boleh sama");
+    }
+    if (amount <= 0) {
+      throw new Error("Jumlah transfer harus lebih dari 0");
+    }
+
+    await this.db.withExclusiveTransactionAsync(async (txn) => {
+      const source = (await txn.getFirstAsync(
+        "SELECT balance FROM categories WHERE id = ?",
+        [sourceCategoryId]
+      )) as { balance: number } | undefined;
+
+      if (!source) {
+        throw new Error("Kategori sumber tidak ditemukan");
+      }
+
+      const targetExists = await txn.getFirstAsync(
+        "SELECT 1 FROM categories WHERE id = ?",
+        [targetCategoryId]
+      );
+
+      if (!targetExists) {
+        throw new Error("Kategori tujuan tidak ditemukan");
+      }
+
+      if (source.balance < amount) {
+        throw new Error("Saldo kategori sumber tidak mencukupi");
+      }
+
+      await txn.runAsync(
+        "UPDATE categories SET balance = balance - ? WHERE id = ?",
+        [amount, sourceCategoryId]
+      );
+
+      await txn.runAsync(
+        "UPDATE categories SET balance = balance + ? WHERE id = ?",
+        [amount, targetCategoryId]
+      );
+    });
+  }
+
   // CRUD untuk Expense Types
   async getExpenseTypes(): Promise<ExpenseType[]> {
     if (!this.db) throw new Error("Database not initialized");
@@ -659,19 +707,19 @@ class Database {
       const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
       const endDate = `${year}-${month.toString().padStart(2, "0")}-31`;
 
-      const incomeResult = (await this.db.getFirstAsync(
-        'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = "income" AND date BETWEEN ? AND ?',
+      // Optimized: Gabung 2 query jadi 1 dengan conditional SUM
+      const result = (await this.db.getFirstAsync(
+        `SELECT 
+          COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as totalIncome,
+          COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as totalExpense
+        FROM transactions 
+        WHERE date BETWEEN ? AND ?`,
         [startDate, endDate]
-      )) as { total: number };
-
-      const expenseResult = (await this.db.getFirstAsync(
-        'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = "expense" AND date BETWEEN ? AND ?',
-        [startDate, endDate]
-      )) as { total: number };
+      )) as { totalIncome: number; totalExpense: number };
 
       return {
-        totalIncome: incomeResult.total,
-        totalExpense: expenseResult.total,
+        totalIncome: result.totalIncome,
+        totalExpense: result.totalExpense,
       };
     } catch (error) {
       console.error("Error getting monthly stats:", error);

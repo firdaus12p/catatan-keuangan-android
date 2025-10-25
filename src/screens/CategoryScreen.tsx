@@ -1,7 +1,13 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import {
+  FlatList,
+  InteractionManager,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
@@ -9,6 +15,7 @@ import {
   Divider,
   Modal,
   Portal,
+  RadioButton,
   Surface,
   TextInput,
 } from "react-native-paper";
@@ -17,7 +24,19 @@ import { CategoryCard } from "../components/CategoryCard";
 import { useApp } from "../context/AppContext";
 import { Category } from "../db/database";
 import { colors } from "../styles/commonStyles";
-import { formatCurrency } from "../utils/formatCurrency";
+import { showError, showSuccess } from "../utils/alertHelper";
+import {
+  formatCurrency,
+  formatNumberInput,
+  parseNumberInput,
+} from "../utils/formatCurrency";
+import {
+  validateNonEmptyString,
+  validatePercentage,
+  validatePositiveAmount,
+  validateSelection,
+  validateSufficientBalance,
+} from "../utils/validationHelper";
 
 export const CategoryScreen: React.FC = () => {
   const {
@@ -26,10 +45,16 @@ export const CategoryScreen: React.FC = () => {
     addCategory,
     updateCategory,
     deleteCategory,
+    transferCategoryBalance,
   } = useApp();
 
   const { action } = useLocalSearchParams<{ action?: string }>();
   const router = useRouter();
+
+  useEffect(() => {
+    router.prefetch({ pathname: "/(tabs)/transaction" });
+    router.prefetch({ pathname: "/(tabs)/loan" });
+  }, [router]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -37,6 +62,12 @@ export const CategoryScreen: React.FC = () => {
     name: "",
     percentage: "",
   });
+  const [transferModalVisible, setTransferModalVisible] = useState(false);
+  const [transferSourceCategory, setTransferSourceCategory] =
+    useState<Category | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferLoading, setTransferLoading] = useState(false);
 
   // Handle floating action button actions
   useEffect(() => {
@@ -50,8 +81,19 @@ export const CategoryScreen: React.FC = () => {
   // Refresh data saat screen difokuskan
   useFocusEffect(
     React.useCallback(() => {
-      loadCategories();
-    }, [])
+      let isMounted = true;
+      const task = InteractionManager.runAfterInteractions(() => {
+        if (!isMounted) return;
+        loadCategories();
+      });
+
+      return () => {
+        isMounted = false;
+        if (task && typeof task.cancel === "function") {
+          task.cancel();
+        }
+      };
+    }, [loadCategories])
   );
 
   const resetForm = () => {
@@ -78,15 +120,29 @@ export const CategoryScreen: React.FC = () => {
     resetForm();
   };
 
+  const openTransferModal = (category: Category) => {
+    setTransferSourceCategory(category);
+    const defaultTarget = categories.find((cat) => cat.id !== category.id);
+    setTransferTargetId(defaultTarget?.id?.toString() ?? "");
+    setTransferAmount("");
+    setTransferModalVisible(true);
+  };
+
+  const closeTransferModal = () => {
+    setTransferModalVisible(false);
+    setTransferSourceCategory(null);
+    setTransferTargetId("");
+    setTransferAmount("");
+    setTransferLoading(false);
+  };
+
   const validateForm = (): boolean => {
-    if (!formData.name.trim()) {
-      Alert.alert("Error", "Nama kategori tidak boleh kosong");
+    if (!validateNonEmptyString(formData.name.trim(), "Nama kategori")) {
       return false;
     }
 
     const percentage = parseFloat(formData.percentage);
-    if (isNaN(percentage) || percentage <= 0 || percentage > 100) {
-      Alert.alert("Error", "Persentase harus antara 1-100");
+    if (!validatePercentage(percentage)) {
       return false;
     }
 
@@ -96,8 +152,7 @@ export const CategoryScreen: React.FC = () => {
       .reduce((sum, cat) => sum + cat.percentage, 0);
 
     if (currentTotal + percentage > 100) {
-      Alert.alert(
-        "Error",
+      showError(
         `Total persentase akan menjadi ${(currentTotal + percentage).toFixed(
           1
         )}%. Maximum adalah 100%.`
@@ -125,14 +180,13 @@ export const CategoryScreen: React.FC = () => {
       }
 
       closeModal();
-      Alert.alert(
-        "Sukses",
+      showSuccess(
         editingCategory
           ? "Kategori berhasil diperbarui"
           : "Kategori berhasil ditambahkan"
       );
     } catch (error) {
-      Alert.alert("Error", "Gagal menyimpan kategori");
+      showError("Gagal menyimpan kategori");
       console.error("Error saving category:", error);
     }
   };
@@ -140,9 +194,9 @@ export const CategoryScreen: React.FC = () => {
   const handleDelete = async (id: number) => {
     try {
       await deleteCategory(id);
-      Alert.alert("Sukses", "Kategori berhasil dihapus");
+      showSuccess("Kategori berhasil dihapus");
     } catch (error) {
-      Alert.alert("Error", "Gagal menghapus kategori");
+      showError("Gagal menghapus kategori");
       console.error("Error deleting category:", error);
     }
   };
@@ -153,6 +207,73 @@ export const CategoryScreen: React.FC = () => {
     const percentage = categories.reduce((sum, cat) => sum + cat.percentage, 0);
     return { totalBalance: balance, totalPercentage: percentage };
   }, [categories]);
+
+  const availableTransferTargets = useMemo(() => {
+    if (!transferSourceCategory?.id) {
+      return categories;
+    }
+
+    return categories.filter((cat) => cat.id !== transferSourceCategory.id);
+  }, [categories, transferSourceCategory]);
+
+  const hasTransferTargets = availableTransferTargets.length > 0;
+
+  const handleTransferSubmit = async (): Promise<void> => {
+    if (!transferSourceCategory?.id) {
+      return;
+    }
+
+    const amountValue = parseNumberInput(transferAmount);
+
+    if (!validateSelection(transferTargetId, "kategori tujuan")) {
+      return;
+    }
+
+    if (transferSourceCategory.id!.toString() === transferTargetId) {
+      showError("Kategori tujuan tidak boleh sama dengan kategori sumber");
+      return;
+    }
+
+    if (!validatePositiveAmount(amountValue, "Jumlah yang dipindahkan")) {
+      return;
+    }
+
+    if (
+      !validateSufficientBalance(
+        transferSourceCategory.balance,
+        amountValue,
+        `"${transferSourceCategory.name}"`
+      )
+    ) {
+      return;
+    }
+
+    setTransferLoading(true);
+    try {
+      const targetIdNumber = parseInt(transferTargetId, 10);
+      await transferCategoryBalance(
+        transferSourceCategory.id!,
+        targetIdNumber,
+        amountValue
+      );
+
+      const targetName = categories.find(
+        (cat) => cat.id === targetIdNumber
+      )?.name;
+
+      showSuccess(
+        `Saldo sebesar ${formatCurrency(
+          amountValue
+        )} berhasil dipindahkan ke kategori "${targetName ?? "Tujuan"}"`
+      );
+      closeTransferModal();
+    } catch (error) {
+      console.error("Error transferring category balance:", error);
+      showError("Gagal memindahkan saldo kategori");
+    } finally {
+      setTransferLoading(false);
+    }
+  };
 
   const renderHeader = () => (
     <Surface style={styles.summaryContainer} elevation={1}>
@@ -197,6 +318,7 @@ export const CategoryScreen: React.FC = () => {
       category={item}
       onEdit={openEditModal}
       onDelete={handleDelete}
+      onTransfer={openTransferModal}
     />
   );
 
@@ -204,7 +326,7 @@ export const CategoryScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
         <Appbar.Content
-          title="Kelola Kategori"
+          title="📁 Kelola Kategori"
           titleStyle={styles.headerTitle}
         />
       </Appbar.Header>
@@ -216,7 +338,96 @@ export const CategoryScreen: React.FC = () => {
         ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        // ✅ OPTIMIZED: FlatList performance props
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={true}
+        initialNumToRender={8}
+        updateCellsBatchingPeriod={50}
       />
+
+      <Portal>
+        <Modal
+          visible={transferModalVisible}
+          onDismiss={closeTransferModal}
+          contentContainerStyle={styles.transferModal}
+        >
+          <KeyboardAwareScrollView
+            showsVerticalScrollIndicator={false}
+            enableOnAndroid
+            extraScrollHeight={20}
+          >
+            <Text style={styles.modalTitle}>Transfer Saldo Kategori</Text>
+            <Text style={styles.infoText}>
+              Dari: {transferSourceCategory?.name ?? "-"}
+            </Text>
+            <Text style={styles.infoText}>
+              Saldo tersedia:{" "}
+              {formatCurrency(transferSourceCategory?.balance ?? 0)}
+            </Text>
+
+            <TextInput
+              label="Jumlah yang Dipindahkan"
+              value={transferAmount}
+              onChangeText={(text) => {
+                const formatted = formatNumberInput(text);
+                setTransferAmount(formatted);
+              }}
+              style={styles.input}
+              mode="outlined"
+              keyboardType="numeric"
+              placeholder="Contoh: 50.000"
+              left={<TextInput.Affix text="Rp " />}
+            />
+
+            <Text style={styles.transferLabel}>Kategori Tujuan:</Text>
+            {hasTransferTargets ? (
+              <RadioButton.Group
+                onValueChange={setTransferTargetId}
+                value={transferTargetId}
+              >
+                {availableTransferTargets.map((target) => (
+                  <View key={target.id} style={styles.transferTargetItem}>
+                    <RadioButton value={target.id!.toString()} />
+                    <View style={styles.transferTargetInfo}>
+                      <Text style={styles.transferTargetName}>
+                        {target.name}
+                      </Text>
+                      <Text style={styles.transferTargetBalance}>
+                        Saldo: {formatCurrency(target.balance)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </RadioButton.Group>
+            ) : (
+              <Text style={styles.emptyTransferText}>
+                Tidak ada kategori lain yang tersedia untuk menerima saldo.
+              </Text>
+            )}
+
+            <View style={styles.modalActions}>
+              <Button
+                mode="outlined"
+                onPress={closeTransferModal}
+                style={styles.button}
+                disabled={transferLoading}
+              >
+                Batal
+              </Button>
+              <Button
+                mode="contained"
+                onPress={handleTransferSubmit}
+                style={styles.button}
+                loading={transferLoading}
+                disabled={transferLoading || !hasTransferTargets}
+              >
+                Transfer
+              </Button>
+            </View>
+          </KeyboardAwareScrollView>
+        </Modal>
+      </Portal>
 
       {/* Modal untuk add/edit kategori */}
       <Portal>
@@ -378,5 +589,41 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     marginHorizontal: 8,
+  },
+  transferModal: {
+    backgroundColor: "#FFFFFF",
+    padding: 24,
+    margin: 20,
+    borderRadius: 12,
+    maxHeight: "80%",
+  },
+  transferLabel: {
+    fontSize: 14,
+    color: "#666666",
+    marginBottom: 8,
+  },
+  transferTargetItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  transferTargetInfo: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  transferTargetName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333333",
+  },
+  transferTargetBalance: {
+    fontSize: 12,
+    color: "#666666",
+  },
+  emptyTransferText: {
+    fontSize: 12,
+    color: "#999999",
+    marginBottom: 12,
+    textAlign: "center",
   },
 });

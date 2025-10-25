@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   Button,
   Card,
@@ -12,6 +12,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
+import { showError, showSuccess, showWarning } from "../utils/alertHelper";
 
 export const ResetScreen: React.FC = () => {
   const router = useRouter();
@@ -50,7 +51,7 @@ export const ResetScreen: React.FC = () => {
       (selected) => selected
     );
     if (!hasSelection) {
-      Alert.alert("Peringatan", "Pilih minimal satu item untuk direset");
+      showWarning("Pilih minimal satu item untuk direset");
       return;
     }
     setResetType("custom");
@@ -63,7 +64,7 @@ export const ResetScreen: React.FC = () => {
 
       if (resetType === "all") {
         await resetAllData();
-        Alert.alert("Berhasil", "Semua data telah direset");
+        showSuccess("Semua data telah direset", "Berhasil");
       } else {
         // Custom reset
         if (selectedOptions.transactions) {
@@ -78,7 +79,7 @@ export const ResetScreen: React.FC = () => {
         if (selectedOptions.balances) {
           await resetCategoryBalances();
         }
-        Alert.alert("Berhasil", "Data yang dipilih telah direset");
+        showSuccess("Data yang dipilih telah direset", "Berhasil");
       }
 
       // Reset selection setelah berhasil
@@ -90,7 +91,7 @@ export const ResetScreen: React.FC = () => {
       });
     } catch (error) {
       console.error("Error resetting data:", error);
-      Alert.alert("Error", "Terjadi kesalahan saat mereset data");
+      showError("Terjadi kesalahan saat mereset data");
     }
   };
 

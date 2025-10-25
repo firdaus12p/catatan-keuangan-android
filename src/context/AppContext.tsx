@@ -3,6 +3,7 @@ import React, {
   ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -14,7 +15,10 @@ import {
   LoanPayment,
   Transaction,
 } from "../db/database";
-import { initializeNotifications } from "../utils/notificationHelper";
+import {
+  cleanupNotificationListener,
+  initializeNotifications,
+} from "../utils/notificationHelper";
 
 type MonthlyStats = {
   totalIncome: number;
@@ -40,6 +44,14 @@ interface AppContextType {
   addCategory: (category: Omit<Category, "id">) => Promise<void>;
   updateCategory: (id: number, category: Omit<Category, "id">) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
+  transferCategoryBalance: (
+    sourceCategoryId: number,
+    targetCategoryId: number,
+    amount: number
+  ) => Promise<void>;
+
+  // Optimized data loading
+  loadAllData: (limit?: number, offset?: number) => Promise<void>;
 
   // Expense Types
   expenseTypes: ExpenseType[];
@@ -177,6 +189,27 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     [loadCategories]
   );
 
+  const transferCategoryBalance = useCallback(
+    async (
+      sourceCategoryId: number,
+      targetCategoryId: number,
+      amount: number
+    ): Promise<void> => {
+      try {
+        await database.transferCategoryBalance(
+          sourceCategoryId,
+          targetCategoryId,
+          amount
+        );
+        await loadCategories();
+      } catch (error) {
+        console.error("Error transferring category balance:", error);
+        throw error;
+      }
+    },
+    [loadCategories]
+  );
+
   // Expense Types methods
   const loadExpenseTypes = useCallback(async (): Promise<void> => {
     try {
@@ -296,19 +329,24 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     async (transaction: Omit<Transaction, "id">): Promise<void> => {
       try {
         await database.addTransaction(transaction);
-        await loadTransactions(); // Refresh data
-        await loadCategories(); // Refresh categories untuk update saldo
-        await loadExpenseTypes(); // Refresh jenis pengeluaran
+        const refreshTasks: Promise<void>[] = [
+          loadTransactions(), // Refresh data
+          loadCategories(), // Refresh categories untuk update saldo
+          loadExpenseTypes(), // Refresh jenis pengeluaran
+        ];
 
-        // Refresh statistik jika transaksi bulan ini
         const transactionDate = new Date(transaction.date);
         const now = new Date();
         if (
           transactionDate.getMonth() === now.getMonth() &&
           transactionDate.getFullYear() === now.getFullYear()
         ) {
-          await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+          refreshTasks.push(
+            loadMonthlyStats(now.getFullYear(), now.getMonth() + 1)
+          );
         }
+
+        await Promise.all(refreshTasks);
       } catch (error) {
         console.error("Error adding transaction:", error);
         throw error;
@@ -318,15 +356,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   );
 
   const addGlobalIncome = useCallback(
-    async (amount: number, note: string = "Pemasukan Global"): Promise<void> => {
+    async (
+      amount: number,
+      note: string = "Pemasukan Global"
+    ): Promise<void> => {
       try {
         await database.addGlobalIncome(amount, note);
-        await loadTransactions(); // Refresh data
-        await loadCategories(); // Refresh categories untuk update saldo
-
-        // Refresh statistik bulan ini
         const now = new Date();
-        await loadMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+        await Promise.all([
+          loadTransactions(), // Refresh data
+          loadCategories(), // Refresh categories untuk update saldo
+          loadMonthlyStats(now.getFullYear(), now.getMonth() + 1), // Refresh statistik bulan ini
+        ]);
       } catch (error) {
         console.error("Error adding global income:", error);
         throw error;
@@ -345,13 +386,38 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // ✅ OPTIMIZED: Load all data in parallel for better performance
+  const loadAllData = useCallback(
+    async (limit: number = 50, offset: number = 0): Promise<void> => {
+      setLoading(true);
+      try {
+        const [categoriesData, transactionsData, loansData, expenseTypesData] =
+          await Promise.all([
+            database.getAllCategories(),
+            database.getTransactions(limit, offset),
+            database.getAllLoans(),
+            database.getExpenseTypes(),
+          ]);
+
+        setCategories(categoriesData);
+        setTransactions(transactionsData);
+        setLoans(loansData);
+        setExpenseTypes(expenseTypesData);
+      } catch (error) {
+        console.error("Error loading all data:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   const addLoan = useCallback(
     async (loan: Omit<Loan, "id">): Promise<void> => {
       try {
         await database.addLoan(loan);
-        await loadLoans(); // Refresh data
-        await loadCategories(); // Refresh categories untuk update saldo
-        await loadTransactions(); // Refresh transactions untuk update riwayat
+        // ✅ OPTIMIZED: Parallel data refresh
+        await Promise.all([loadLoans(), loadCategories(), loadTransactions()]);
       } catch (error) {
         console.error("Error adding loan:", error);
         throw error;
@@ -368,9 +434,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     ): Promise<void> => {
       try {
         await database.updateLoanStatus(id, status, repaymentAmount);
-        await loadLoans(); // Refresh data
-        await loadCategories(); // Refresh categories untuk update saldo
-        await loadTransactions(); // Refresh transactions untuk update riwayat
+        // ✅ OPTIMIZED: Parallel data refresh
+        await Promise.all([loadLoans(), loadCategories(), loadTransactions()]);
       } catch (error) {
         console.error("Error updating loan status:", error);
         throw error;
@@ -383,8 +448,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     async (id: number): Promise<void> => {
       try {
         await database.deleteLoan(id);
-        await loadLoans(); // Refresh data
-        await loadCategories(); // Update saldo kategori
+        // ✅ OPTIMIZED: Parallel data refresh
+        await Promise.all([loadLoans(), loadCategories()]);
       } catch (error) {
         console.error("Error deleting loan:", error);
         throw error;
@@ -419,12 +484,22 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       ]);
       setMonthlyStats(createEmptyStats());
     });
-  }, [loadCategories, loadExpenseTypes, loadLoans, loadTransactions, runWithLoading]);
+  }, [
+    loadCategories,
+    loadExpenseTypes,
+    loadLoans,
+    loadTransactions,
+    runWithLoading,
+  ]);
 
   const resetTransactions = useCallback(async (): Promise<void> => {
     await runWithLoading(async () => {
       await database.resetTransactions();
-      await Promise.all([loadCategories(), loadTransactions(), loadExpenseTypes()]);
+      await Promise.all([
+        loadCategories(),
+        loadTransactions(),
+        loadExpenseTypes(),
+      ]);
       setMonthlyStats(createEmptyStats());
     });
   }, [loadCategories, loadExpenseTypes, loadTransactions, runWithLoading]);
@@ -512,6 +587,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       addCategory,
       updateCategory,
       deleteCategory,
+      transferCategoryBalance,
+
+      // Optimized data loading
+      loadAllData,
 
       // Expense Types
       expenseTypes,
@@ -571,11 +650,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       deleteCategory,
       deleteExpenseType,
       deleteLoan,
-      getExpenseTypeTotalsByMonth,
       expenseTypes,
+      getExpenseTypeTotalsByMonth,
       getLoanPayments,
       handleInitializeNotifications,
       initializeApp,
+      loadAllData,
       loadCategories,
       loadExpenseTypes,
       loadLoans,
@@ -591,11 +671,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       resetLoans,
       resetTransactions,
       totalAllTimeBalance,
+      transferCategoryBalance,
       updateCategory,
       updateExpenseType,
       updateLoanStatus,
     ]
   );
+
+  // Cleanup notification listener saat AppProvider unmount
+  // ⚠️ FIXED: Menggunakan useEffect cleanup (React Native compatible)
+  useEffect(() => {
+    return () => {
+      cleanupNotificationListener();
+    };
+  }, []);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

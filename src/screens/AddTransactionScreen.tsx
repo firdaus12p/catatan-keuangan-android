@@ -2,7 +2,13 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
@@ -17,11 +23,16 @@ import {
   TextInput,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TransactionItem } from "../components/TransactionItem";
 import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
+import { TransactionItem } from "../components/TransactionItem";
 import { useApp } from "../context/AppContext";
 import { Transaction } from "../db/database";
 import { colors } from "../styles/commonStyles";
+import { showConfirm, showError, showSuccess } from "../utils/alertHelper";
+import {
+  getAllocationDeficit,
+  isAllocationComplete,
+} from "../utils/allocation";
 import {
   formatDate,
   getCurrentMonthYear,
@@ -33,6 +44,11 @@ import {
   formatNumberInput,
   parseNumberInput,
 } from "../utils/formatCurrency";
+import {
+  validatePositiveAmount,
+  validateSelection,
+  validateSufficientBalance,
+} from "../utils/validationHelper";
 
 export const AddTransactionScreen: React.FC = () => {
   const {
@@ -68,6 +84,7 @@ export const AddTransactionScreen: React.FC = () => {
   );
   const [expenseTypeManagerVisible, setExpenseTypeManagerVisible] =
     useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Handle floating action button actions
   useEffect(() => {
@@ -118,33 +135,35 @@ export const AddTransactionScreen: React.FC = () => {
   }, [transactionType, formData.expenseTypeId]);
 
   // Hitung total persentase alokasi dari semua kategori
+  const hasCategories = categories.length > 0;
   const totalAllocationPercentage = useMemo(() => {
     return categories.reduce((sum, cat) => sum + cat.percentage, 0);
   }, [categories]);
 
   // Validasi total alokasi sebelum membuka modal
   const validateAllocation = useCallback(() => {
-    if (totalAllocationPercentage < 100) {
-      Alert.alert(
+    if (!hasCategories) {
+      return true;
+    }
+
+    if (!isAllocationComplete(totalAllocationPercentage)) {
+      const deficit = getAllocationDeficit(totalAllocationPercentage);
+      showConfirm(
         "Alokasi Belum Lengkap",
         `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
           1
-        )}%.\n\nAnda perlu melengkapi alokasi hingga 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
-        [
-          {
-            text: "OK",
-            style: "default",
-          },
-          {
-            text: "Ke Halaman Kategori",
-            onPress: () => router.push("/(tabs)/category"),
-          },
-        ]
+        )}%.\n\nTambahkan alokasi sebesar ${deficit.toFixed(
+          1
+        )}% lagi agar mencapai 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
+        () => router.push("/(tabs)/category"),
+        undefined,
+        "Ke Halaman Kategori",
+        "OK"
       );
       return false;
     }
     return true;
-  }, [totalAllocationPercentage, router]);
+  }, [hasCategories, router, totalAllocationPercentage]);
 
   const resetForm = useCallback(() => {
     setFormData({
@@ -182,36 +201,36 @@ export const AddTransactionScreen: React.FC = () => {
   const validateForm = useCallback((): boolean => {
     const amount = parseNumberInput(formData.amount);
 
-    if (amount <= 0) {
-      Alert.alert("Error", "Jumlah harus lebih dari 0");
+    if (!validatePositiveAmount(amount)) {
       return false;
     }
 
-    if (!isGlobalIncome && !formData.categoryId) {
-      Alert.alert("Error", "Pilih kategori terlebih dahulu");
+    if (
+      !isGlobalIncome &&
+      !validateSelection(formData.categoryId, "kategori")
+    ) {
       return false;
     }
 
     // Validasi saldo untuk pengeluaran
     if (transactionType === "expense") {
-      if (!formData.expenseTypeId) {
-        Alert.alert("Error", "Pilih jenis pengeluaran terlebih dahulu");
+      if (!validateSelection(formData.expenseTypeId, "jenis pengeluaran")) {
         return false;
       }
 
       const selectedCategory = categories.find(
         (cat) => cat.id!.toString() === formData.categoryId
       );
-      if (selectedCategory && selectedCategory.balance < amount) {
-        Alert.alert(
-          "Error",
-          `Saldo kategori "${
-            selectedCategory.name
-          }" tidak mencukupi.\nSaldo: ${formatCurrency(
-            selectedCategory.balance
-          )}`
-        );
-        return false;
+      if (selectedCategory) {
+        if (
+          !validateSufficientBalance(
+            selectedCategory.balance,
+            amount,
+            `kategori "${selectedCategory.name}"`
+          )
+        ) {
+          return false;
+        }
       }
     }
 
@@ -264,6 +283,9 @@ export const AddTransactionScreen: React.FC = () => {
   );
 
   const handleSave = useCallback(async () => {
+    if (saving) {
+      return;
+    }
     if (!validateForm()) return;
 
     // Validasi alokasi sebelum menyimpan transaksi
@@ -271,6 +293,7 @@ export const AddTransactionScreen: React.FC = () => {
       return;
     }
 
+    setSaving(true);
     try {
       const amount = parseNumberInput(formData.amount);
 
@@ -297,12 +320,15 @@ export const AddTransactionScreen: React.FC = () => {
       }
 
       closeModal();
-      Alert.alert("Sukses", "Transaksi berhasil ditambahkan");
+      showSuccess("Transaksi berhasil ditambahkan");
     } catch (error) {
-      Alert.alert("Error", "Gagal menambahkan transaksi");
+      showError("Gagal menambahkan transaksi");
       console.error("Error saving transaction:", error);
+    } finally {
+      setSaving(false);
     }
   }, [
+    saving,
     validateForm,
     validateAllocation,
     formData,
@@ -496,7 +522,7 @@ export const AddTransactionScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
-        <Appbar.Content title="Transaksi" titleStyle={styles.headerTitle} />
+        <Appbar.Content title="💰 Transaksi" titleStyle={styles.headerTitle} />
       </Appbar.Header>
 
       <FlatList
@@ -506,6 +532,12 @@ export const AddTransactionScreen: React.FC = () => {
         ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        // ✅ OPTIMIZED: FlatList performance props
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
+        initialNumToRender={10}
+        updateCellsBatchingPeriod={50}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <MaterialIcons name="receipt-long" size={64} color="#CCCCCC" />
@@ -607,7 +639,9 @@ export const AddTransactionScreen: React.FC = () => {
             {transactionType === "expense" && !isGlobalIncome && (
               <View style={styles.expenseTypeSection}>
                 <View style={styles.expenseTypeHeader}>
-                  <Text style={styles.expenseTypeLabel}>Jenis Pengeluaran:</Text>
+                  <Text style={styles.expenseTypeLabel}>
+                    Jenis Pengeluaran:
+                  </Text>
                   <TouchableOpacity
                     onPress={openExpenseTypeManager}
                     style={styles.expenseTypeManageButton}
@@ -631,7 +665,9 @@ export const AddTransactionScreen: React.FC = () => {
                       <View key={type.id} style={styles.expenseTypeItem}>
                         <RadioButton value={type.id!.toString()} />
                         <View style={styles.expenseTypeInfo}>
-                          <Text style={styles.expenseTypeName}>{type.name}</Text>
+                          <Text style={styles.expenseTypeName}>
+                            {type.name}
+                          </Text>
                           <Text style={styles.expenseTypeSpent}>
                             Total: {formatCurrency(type.total_spent)}
                           </Text>
@@ -673,6 +709,7 @@ export const AddTransactionScreen: React.FC = () => {
                 mode="outlined"
                 onPress={closeModal}
                 style={styles.button}
+                disabled={saving}
               >
                 Batal
               </Button>
@@ -680,6 +717,8 @@ export const AddTransactionScreen: React.FC = () => {
                 mode="contained"
                 onPress={handleSave}
                 style={styles.button}
+                loading={saving}
+                disabled={saving}
               >
                 Simpan
               </Button>

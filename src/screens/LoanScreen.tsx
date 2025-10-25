@@ -28,7 +28,7 @@ import { useApp } from "../context/AppContext";
 import { Category, Loan, LoanPayment } from "../db/database";
 import { colors } from "../styles/commonStyles";
 import { showConfirm, showError, showSuccess } from "../utils/alertHelper";
-import { CHART, TIMING } from "../utils/constants";
+import { CHART, FLATLIST_CONFIG, TIMING } from "../utils/constants";
 import { formatDate, getTodayString } from "../utils/dateHelper";
 import {
   formatCurrency,
@@ -595,11 +595,13 @@ export const LoanScreen: React.FC = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         // ✅ OPTIMIZED: FlatList performance props
-        maxToRenderPerBatch={10}
-        windowSize={5}
+        maxToRenderPerBatch={FLATLIST_CONFIG.DEFAULT.MAX_TO_RENDER_PER_BATCH}
+        windowSize={FLATLIST_CONFIG.DEFAULT.WINDOW_SIZE}
         removeClippedSubviews={true}
-        initialNumToRender={10}
-        updateCellsBatchingPeriod={50}
+        initialNumToRender={FLATLIST_CONFIG.DEFAULT.INITIAL_NUM_TO_RENDER}
+        updateCellsBatchingPeriod={
+          FLATLIST_CONFIG.DEFAULT.UPDATE_CELLS_BATCHING_PERIOD
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <MaterialIcons name="handshake" size={64} color="#CCCCCC" />

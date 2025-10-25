@@ -14,6 +14,7 @@ import {
   Appbar,
   Button,
   Card,
+  Checkbox,
   Chip,
   Divider,
   Modal,
@@ -33,6 +34,7 @@ import {
   getAllocationDeficit,
   isAllocationComplete,
 } from "../utils/allocation";
+import { FLATLIST_CONFIG } from "../utils/constants";
 import {
   formatDate,
   getCurrentMonthYear,
@@ -58,8 +60,10 @@ export const AddTransactionScreen: React.FC = () => {
     loadCategories,
     loadTransactions,
     loadExpenseTypes,
+    loadAllData,
     addTransaction,
     addGlobalIncome,
+    addMultiCategoryIncome,
     addExpenseType,
     updateExpenseType,
     deleteExpenseType,
@@ -73,6 +77,7 @@ export const AddTransactionScreen: React.FC = () => {
     "income"
   );
   const [isGlobalIncome, setIsGlobalIncome] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [formData, setFormData] = useState({
     amount: "",
     categoryId: "",
@@ -102,10 +107,8 @@ export const AddTransactionScreen: React.FC = () => {
   // Refresh data saat screen difokuskan
   useFocusEffect(
     React.useCallback(() => {
-      loadCategories();
-      loadTransactions();
-      loadExpenseTypes();
-    }, [])
+      loadAllData(); // ✅ OPTIMIZED: Load all data in parallel
+    }, [loadAllData])
   );
 
   // Set default expense type saat tersedia
@@ -173,6 +176,7 @@ export const AddTransactionScreen: React.FC = () => {
       expenseTypeId: "",
     });
     setIsGlobalIncome(false);
+    setSelectedCategoryIds([]);
     setTransactionType("income");
   }, []);
 
@@ -205,15 +209,42 @@ export const AddTransactionScreen: React.FC = () => {
       return false;
     }
 
-    if (
-      !isGlobalIncome &&
-      !validateSelection(formData.categoryId, "kategori")
-    ) {
-      return false;
+    // Validasi untuk pemasukan
+    if (transactionType === "income" && !isGlobalIncome) {
+      // Multi-category selection validation
+      if (selectedCategoryIds.length === 0) {
+        showError("Pilih minimal satu kategori untuk pemasukan spesifik");
+        return false;
+      }
+
+      // Peringatan jika memilih semua kategori (sama dengan global)
+      if (selectedCategoryIds.length === categories.length) {
+        showConfirm(
+          "Peringatan",
+          "Anda telah memilih semua kategori. Ini sama dengan menggunakan mode 'Pemasukan Global'. Apakah Anda ingin melanjutkan atau menggunakan mode Global?",
+          () => {
+            // User pilih lanjut dengan multi-category
+            return true;
+          },
+          () => {
+            // User pilih ganti ke global
+            setIsGlobalIncome(true);
+            setSelectedCategoryIds([]);
+            return false;
+          },
+          "Lanjutkan Multi Kategori",
+          "Gunakan Mode Global"
+        );
+        return false;
+      }
     }
 
-    // Validasi saldo untuk pengeluaran
+    // Validasi untuk pengeluaran
     if (transactionType === "expense") {
+      if (!validateSelection(formData.categoryId, "kategori")) {
+        return false;
+      }
+
       if (!validateSelection(formData.expenseTypeId, "jenis pengeluaran")) {
         return false;
       }
@@ -242,6 +273,7 @@ export const AddTransactionScreen: React.FC = () => {
     formData.expenseTypeId,
     transactionType,
     categories,
+    selectedCategoryIds,
   ]);
 
   const openExpenseTypeManager = useCallback(() => {
@@ -297,23 +329,29 @@ export const AddTransactionScreen: React.FC = () => {
     try {
       const amount = parseNumberInput(formData.amount);
 
-      if (transactionType === "income" && isGlobalIncome) {
-        // Pemasukan global - dibagi otomatis ke semua kategori
-        await addGlobalIncome(amount, formData.note || "Pemasukan Global");
+      if (transactionType === "income") {
+        if (isGlobalIncome) {
+          // Pemasukan global - dibagi otomatis ke semua kategori
+          await addGlobalIncome(amount, formData.note || "Pemasukan Global");
+        } else {
+          // Pemasukan spesifik multi-kategori
+          await addMultiCategoryIncome(
+            amount,
+            selectedCategoryIds,
+            formData.note || "Pemasukan Multi Kategori"
+          );
+        }
       } else {
-        // Transaksi biasa
+        // Pengeluaran - single category
         const transactionData = {
-          type: transactionType,
+          type: "expense" as const,
           amount,
           category_id: parseInt(formData.categoryId),
-          note:
-            formData.note ||
-            (transactionType === "income" ? "Pemasukan" : "Pengeluaran"),
+          note: formData.note || "Pengeluaran",
           date: getTodayString(),
-          expense_type_id:
-            transactionType === "expense" && formData.expenseTypeId
-              ? parseInt(formData.expenseTypeId, 10)
-              : null,
+          expense_type_id: formData.expenseTypeId
+            ? parseInt(formData.expenseTypeId, 10)
+            : null,
         };
 
         await addTransaction(transactionData);
@@ -334,7 +372,9 @@ export const AddTransactionScreen: React.FC = () => {
     formData,
     transactionType,
     isGlobalIncome,
+    selectedCategoryIds,
     addGlobalIncome,
+    addMultiCategoryIncome,
     addTransaction,
     closeModal,
   ]);
@@ -533,11 +573,13 @@ export const AddTransactionScreen: React.FC = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         // ✅ OPTIMIZED: FlatList performance props
-        maxToRenderPerBatch={10}
-        windowSize={5}
+        maxToRenderPerBatch={FLATLIST_CONFIG.DEFAULT.MAX_TO_RENDER_PER_BATCH}
+        windowSize={FLATLIST_CONFIG.DEFAULT.WINDOW_SIZE}
         removeClippedSubviews={true}
-        initialNumToRender={10}
-        updateCellsBatchingPeriod={50}
+        initialNumToRender={FLATLIST_CONFIG.DEFAULT.INITIAL_NUM_TO_RENDER}
+        updateCellsBatchingPeriod={
+          FLATLIST_CONFIG.DEFAULT.UPDATE_CELLS_BATCHING_PERIOD
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <MaterialIcons name="receipt-long" size={64} color="#CCCCCC" />
@@ -614,25 +656,113 @@ export const AddTransactionScreen: React.FC = () => {
             {/* Pilihan kategori - hanya jika bukan global income */}
             {!(transactionType === "income" && isGlobalIncome) && (
               <View style={styles.categorySection}>
-                <Text style={styles.categoryLabel}>Pilih Kategori:</Text>
-                <RadioButton.Group
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, categoryId: value })
-                  }
-                  value={formData.categoryId}
-                >
-                  {categories.map((category) => (
-                    <View key={category.id} style={styles.categoryItem}>
-                      <RadioButton value={category.id!.toString()} />
-                      <View style={styles.categoryInfo}>
-                        <Text style={styles.categoryName}>{category.name}</Text>
-                        <Text style={styles.categoryBalance}>
-                          Saldo: {formatCurrency(category.balance)}
+                <Text style={styles.categoryLabel}>
+                  {transactionType === "income" && !isGlobalIncome
+                    ? "Pilih Kategori (bisa pilih lebih dari 1):"
+                    : "Pilih Kategori:"}
+                </Text>
+
+                {/* Multi-selection untuk pemasukan spesifik */}
+                {transactionType === "income" && !isGlobalIncome ? (
+                  <View style={styles.multiSelectContainer}>
+                    {categories.map((category) => {
+                      const isSelected = selectedCategoryIds.includes(
+                        category.id!
+                      );
+                      return (
+                        <TouchableOpacity
+                          key={category.id}
+                          style={[
+                            styles.categoryItem,
+                            isSelected && styles.selectedCategoryItem,
+                          ]}
+                          onPress={() => {
+                            const categoryId = category.id!;
+                            if (isSelected) {
+                              // Remove from selection
+                              setSelectedCategoryIds((prev) =>
+                                prev.filter((id) => id !== categoryId)
+                              );
+                            } else {
+                              // Add to selection
+                              setSelectedCategoryIds((prev) => [
+                                ...prev,
+                                categoryId,
+                              ]);
+                            }
+                          }}
+                        >
+                          <Checkbox
+                            status={isSelected ? "checked" : "unchecked"}
+                            onPress={() => {
+                              const categoryId = category.id!;
+                              if (isSelected) {
+                                setSelectedCategoryIds((prev) =>
+                                  prev.filter((id) => id !== categoryId)
+                                );
+                              } else {
+                                setSelectedCategoryIds((prev) => [
+                                  ...prev,
+                                  categoryId,
+                                ]);
+                              }
+                            }}
+                          />
+                          <View style={styles.categoryInfo}>
+                            <Text
+                              style={[
+                                styles.categoryName,
+                                isSelected && styles.selectedCategoryName,
+                              ]}
+                            >
+                              {category.name}
+                            </Text>
+                            <Text style={styles.categoryBalance}>
+                              Saldo: {formatCurrency(category.balance)}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {selectedCategoryIds.length > 0 && (
+                      <View style={styles.selectionSummary}>
+                        <Text style={styles.selectionText}>
+                          {selectedCategoryIds.length} kategori dipilih
                         </Text>
+                        <TouchableOpacity
+                          onPress={() => setSelectedCategoryIds([])}
+                          style={styles.clearSelectionButton}
+                        >
+                          <Text style={styles.clearSelectionText}>
+                            Bersihkan
+                          </Text>
+                        </TouchableOpacity>
                       </View>
-                    </View>
-                  ))}
-                </RadioButton.Group>
+                    )}
+                  </View>
+                ) : (
+                  /* Single selection untuk expense */
+                  <RadioButton.Group
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, categoryId: value })
+                    }
+                    value={formData.categoryId}
+                  >
+                    {categories.map((category) => (
+                      <View key={category.id} style={styles.categoryItem}>
+                        <RadioButton value={category.id!.toString()} />
+                        <View style={styles.categoryInfo}>
+                          <Text style={styles.categoryName}>
+                            {category.name}
+                          </Text>
+                          <Text style={styles.categoryBalance}>
+                            Saldo: {formatCurrency(category.balance)}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </RadioButton.Group>
+                )}
               </View>
             )}
 
@@ -1022,5 +1152,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
+  },
+  multiSelectContainer: {
+    gap: 8,
+  },
+  selectedCategoryItem: {
+    backgroundColor: "#E3F2FD",
+    borderColor: colors.income,
+    borderWidth: 1,
+  },
+  selectedCategoryName: {
+    color: colors.income,
+    fontWeight: "600",
+  },
+  selectionSummary: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#F0F8FF",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#B3D9FF",
+  },
+  selectionText: {
+    fontSize: 14,
+    color: colors.income,
+    fontWeight: "500",
+  },
+  clearSelectionButton: {
+    backgroundColor: colors.expense,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  clearSelectionText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "500",
   },
 });

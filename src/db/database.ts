@@ -49,8 +49,35 @@ export interface ExpenseType {
 class Database {
   private db: SQLite.SQLiteDatabase | null = null;
   private expenseTypesHasCreatedAtCache: boolean | null = null;
+  private isInitializing: boolean = false;
+
+  async ensureInitialized(): Promise<void> {
+    if (this.db && !this.isInitializing) {
+      try {
+        // Test koneksi database dengan query sederhana
+        await this.db.getFirstAsync("SELECT 1");
+        return;
+      } catch (error) {
+        console.warn("Database connection lost, reinitializing...", error);
+        this.db = null;
+      }
+    }
+
+    if (!this.db && !this.isInitializing) {
+      await this.initializeDatabase();
+    }
+  }
 
   async initializeDatabase(): Promise<void> {
+    if (this.isInitializing) {
+      // Wait for existing initialization
+      while (this.isInitializing) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return;
+    }
+
+    this.isInitializing = true;
     try {
       this.db = await SQLite.openDatabaseAsync("catatku.db");
 
@@ -138,7 +165,10 @@ class Database {
       // Database initialized successfully - ready for production
     } catch (error) {
       console.error("Error initializing database:", error);
+      this.db = null;
       throw error;
+    } finally {
+      this.isInitializing = false;
     }
   }
 
@@ -291,6 +321,7 @@ class Database {
 
   // CRUD untuk Categories
   async getAllCategories(): Promise<Category[]> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       return await this.db.getAllAsync(
@@ -303,6 +334,7 @@ class Database {
   }
 
   async addCategory(category: Omit<Category, "id">): Promise<number> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       const result = await this.db.runAsync(
@@ -320,6 +352,7 @@ class Database {
     id: number,
     category: Omit<Category, "id">
   ): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.runAsync(
@@ -333,6 +366,7 @@ class Database {
   }
 
   async deleteCategory(id: number): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.runAsync("DELETE FROM categories WHERE id = ?", [id]);
@@ -347,6 +381,7 @@ class Database {
     targetCategoryId: number,
     amount: number
   ): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     if (sourceCategoryId === targetCategoryId) {
       throw new Error("Kategori sumber dan tujuan tidak boleh sama");
@@ -392,6 +427,7 @@ class Database {
 
   // CRUD untuk Expense Types
   async getExpenseTypes(): Promise<ExpenseType[]> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.ensureExpenseTypeCreatedAtColumn();
@@ -407,6 +443,7 @@ class Database {
   }
 
   async addExpenseType(name: string): Promise<number> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       return await this.insertExpenseTypeRow(name.trim(), 0);
@@ -417,6 +454,7 @@ class Database {
   }
 
   async updateExpenseType(id: number, name: string): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.runAsync("UPDATE expense_types SET name = ? WHERE id = ?", [
@@ -430,6 +468,7 @@ class Database {
   }
 
   async deleteExpenseType(id: number): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.withExclusiveTransactionAsync(async (txn) => {
@@ -446,6 +485,7 @@ class Database {
   }
 
   async recalculateExpenseTypeTotals(): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.ensureExpenseTypeTotalsColumn();
@@ -469,6 +509,7 @@ class Database {
     limit: number = 50,
     offset: number = 0
   ): Promise<Transaction[]> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       return await this.db.getAllAsync(
@@ -488,6 +529,7 @@ class Database {
   }
 
   async addTransaction(transaction: Omit<Transaction, "id">): Promise<number> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       let insertedId = 0;
@@ -541,6 +583,7 @@ class Database {
     amount: number,
     note: string = "Pemasukan Global"
   ): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       const categories = await this.getAllCategories();
@@ -575,8 +618,76 @@ class Database {
     }
   }
 
+  /**
+   * Menambah pemasukan ke beberapa kategori tertentu berdasarkan persentase mereka
+   */
+  async addMultiCategoryIncome(
+    amount: number,
+    categoryIds: number[],
+    note: string = "Pemasukan Multi Kategori"
+  ): Promise<void> {
+    await this.ensureInitialized();
+    if (!this.db) throw new Error("Database not initialized");
+    if (!categoryIds.length)
+      throw new Error("At least one category must be selected");
+
+    try {
+      // Ambil kategori yang dipilih beserta persentasenya
+      const categories = await this.getAllCategories();
+      const selectedCategories = categories.filter((cat) =>
+        categoryIds.includes(cat.id!)
+      );
+
+      if (selectedCategories.length !== categoryIds.length) {
+        throw new Error("Some selected categories not found");
+      }
+
+      // Hitung total persentase dari kategori yang dipilih
+      const totalSelectedPercentage = selectedCategories.reduce(
+        (sum, cat) => sum + cat.percentage,
+        0
+      );
+
+      if (totalSelectedPercentage === 0) {
+        throw new Error("Selected categories have no allocation percentage");
+      }
+
+      const date = new Date().toISOString();
+
+      // Distribusikan pemasukan berdasarkan proporsi persentase kategori yang dipilih
+      await this.db.withExclusiveTransactionAsync(async (txn) => {
+        for (const category of selectedCategories) {
+          // Hitung proporsi kategori ini dari total kategori yang dipilih
+          const proportion = category.percentage / totalSelectedPercentage;
+          const categoryAmount = amount * proportion;
+
+          await txn.runAsync(
+            "INSERT INTO transactions (type, amount, category_id, note, date, expense_type_id) VALUES (?, ?, ?, ?, ?, ?)",
+            [
+              "income",
+              categoryAmount,
+              category.id!,
+              `${note} (${category.percentage}% dari ${selectedCategories.length} kategori)`,
+              date,
+              null,
+            ]
+          );
+
+          await txn.runAsync(
+            "UPDATE categories SET balance = balance + ? WHERE id = ?",
+            [categoryAmount, category.id!]
+          );
+        }
+      });
+    } catch (error) {
+      console.error("Error adding multi category income:", error);
+      throw error;
+    }
+  }
+
   // CRUD untuk Loans
   async getAllLoans(): Promise<Loan[]> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       return await this.db.getAllAsync(
@@ -589,6 +700,7 @@ class Database {
   }
 
   async addLoan(loan: Omit<Loan, "id">): Promise<number> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       let insertedId = 0;
@@ -617,6 +729,7 @@ class Database {
     status: "unpaid" | "half" | "paid",
     repaymentAmount?: number
   ): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.withExclusiveTransactionAsync(async (txn) => {
@@ -688,6 +801,7 @@ class Database {
   }
 
   async deleteLoan(id: number): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.runAsync("DELETE FROM loans WHERE id = ?", [id]);
@@ -702,6 +816,7 @@ class Database {
     year: number,
     month: number
   ): Promise<{ totalIncome: number; totalExpense: number }> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
@@ -731,6 +846,7 @@ class Database {
     year: number,
     month: number
   ): Promise<ExpenseType[]> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       const monthStr = month.toString().padStart(2, "0");
@@ -760,6 +876,7 @@ class Database {
   }
 
   async getTotalIncome(): Promise<number> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       const result = (await this.db.getFirstAsync(
@@ -774,6 +891,7 @@ class Database {
 
   // Loan Payment History methods
   async getLoanPayments(loanId: number): Promise<LoanPayment[]> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       return await this.db.getAllAsync(
@@ -787,6 +905,7 @@ class Database {
   }
 
   async getAllLoanPayments(): Promise<LoanPayment[]> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       return await this.db.getAllAsync(
@@ -800,6 +919,7 @@ class Database {
 
   // Reset functions untuk membersihkan data
   async resetAllData(): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.execAsync("DELETE FROM transactions");
@@ -814,6 +934,7 @@ class Database {
   }
 
   async resetTransactions(): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.execAsync("DELETE FROM transactions");
@@ -826,6 +947,7 @@ class Database {
   }
 
   async resetLoans(): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.execAsync("DELETE FROM loan_payments");
@@ -837,6 +959,7 @@ class Database {
   }
 
   async resetCategories(): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.execAsync("DELETE FROM categories");
@@ -847,6 +970,7 @@ class Database {
   }
 
   async resetCategoryBalances(): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.execAsync("UPDATE categories SET balance = 0");
@@ -858,6 +982,7 @@ class Database {
 
   // Membersihkan transaksi pinjaman yang tidak seharusnya ada
   async cleanupLoanTransactions(): Promise<void> {
+    await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
       // Hapus semua transaksi yang berkaitan dengan pinjaman

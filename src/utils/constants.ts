@@ -24,6 +24,33 @@ export const TIMING = {
   MODAL_TRANSITION_DELAY: 300,
 } as const;
 
+// ==================== FLATLIST PERFORMANCE ====================
+export const FLATLIST_CONFIG = {
+  // Standard config untuk list dengan banyak item
+  DEFAULT: {
+    MAX_TO_RENDER_PER_BATCH: 10,
+    WINDOW_SIZE: 5,
+    INITIAL_NUM_TO_RENDER: 10,
+    UPDATE_CELLS_BATCHING_PERIOD: 50,
+  },
+
+  // Config untuk list kategori (item lebih sedikit)
+  CATEGORY: {
+    MAX_TO_RENDER_PER_BATCH: 8,
+    WINDOW_SIZE: 5,
+    INITIAL_NUM_TO_RENDER: 8,
+    UPDATE_CELLS_BATCHING_PERIOD: 50,
+  },
+} as const;
+
+// ==================== TYPOGRAPHY ====================
+export const FONT_WEIGHTS = {
+  NORMAL: "400",
+  MEDIUM: "500",
+  SEMIBOLD: "600",
+  BOLD: "700",
+} as const;
+
 // ==================== BALANCE THRESHOLDS ====================
 export const BALANCE_THRESHOLDS = {
   HIGH: 100000, // Saldo tinggi (warna hijau)

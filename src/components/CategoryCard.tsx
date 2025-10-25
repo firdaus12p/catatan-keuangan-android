@@ -1,10 +1,11 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import React from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Card, IconButton, ProgressBar } from "react-native-paper";
 import { Category } from "../db/database";
 import { colors } from "../styles/commonStyles";
-import { BALANCE_THRESHOLDS } from "../utils/constants";
+import { showConfirm } from "../utils/alertHelper";
+import { BALANCE_THRESHOLDS, FONT_WEIGHTS } from "../utils/constants";
 import { formatCurrency } from "../utils/formatCurrency";
 
 interface CategoryCardProps {
@@ -17,17 +18,10 @@ interface CategoryCardProps {
 export const CategoryCard: React.FC<CategoryCardProps> = React.memo(
   ({ category, onEdit, onDelete, onTransfer }) => {
     const handleDelete = () => {
-      Alert.alert(
+      showConfirm(
         "Hapus Kategori",
         `Apakah Anda yakin ingin menghapus kategori "${category.name}"?`,
-        [
-          { text: "Batal", style: "cancel" },
-          {
-            text: "Hapus",
-            style: "destructive",
-            onPress: () => onDelete(category.id!),
-          },
-        ]
+        () => onDelete(category.id!)
       );
     };
 
@@ -137,7 +131,7 @@ const styles = StyleSheet.create({
   percentage: {
     fontSize: 14,
     color: "#666666",
-    fontWeight: "500",
+    fontWeight: FONT_WEIGHTS.MEDIUM,
   },
   actions: {
     flexDirection: "row",

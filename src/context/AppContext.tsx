@@ -69,6 +69,11 @@ interface AppContextType {
   loadTransactions: (limit?: number, offset?: number) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, "id">) => Promise<void>;
   addGlobalIncome: (amount: number, note?: string) => Promise<void>;
+  addMultiCategoryIncome: (
+    amount: number,
+    categoryIds: number[],
+    note?: string
+  ) => Promise<void>;
 
   // Loans
   loans: Loan[];
@@ -375,6 +380,27 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     },
     [loadCategories, loadMonthlyStats, loadTransactions]
   );
+  const addMultiCategoryIncome = useCallback(
+    async (
+      amount: number,
+      categoryIds: number[],
+      note: string = "Pemasukan Multi Kategori"
+    ): Promise<void> => {
+      try {
+        await database.addMultiCategoryIncome(amount, categoryIds, note);
+        const now = new Date();
+        await Promise.all([
+          loadTransactions(), // Refresh data
+          loadCategories(), // Refresh categories untuk update saldo
+          loadMonthlyStats(now.getFullYear(), now.getMonth() + 1), // Refresh statistik bulan ini
+        ]);
+      } catch (error) {
+        console.error("Error adding multi category income:", error);
+        throw error;
+      }
+    },
+    [loadCategories, loadMonthlyStats, loadTransactions]
+  );
 
   // Loans methods
   const loadLoans = useCallback(async (): Promise<void> => {
@@ -605,6 +631,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       loadTransactions,
       addTransaction,
       addGlobalIncome,
+      addMultiCategoryIncome,
 
       // Loans
       loans,
@@ -643,6 +670,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       addCategory,
       addExpenseType,
       addGlobalIncome,
+      addMultiCategoryIncome,
       addLoan,
       addTransaction,
       categories,

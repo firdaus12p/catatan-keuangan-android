@@ -25,6 +25,7 @@ import { useApp } from "../context/AppContext";
 import { Category } from "../db/database";
 import { colors } from "../styles/commonStyles";
 import { showError, showSuccess } from "../utils/alertHelper";
+import { FLATLIST_CONFIG } from "../utils/constants";
 import {
   formatCurrency,
   formatNumberInput,
@@ -339,11 +340,13 @@ export const CategoryScreen: React.FC = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         // ✅ OPTIMIZED: FlatList performance props
-        maxToRenderPerBatch={8}
-        windowSize={5}
+        maxToRenderPerBatch={FLATLIST_CONFIG.CATEGORY.MAX_TO_RENDER_PER_BATCH}
+        windowSize={FLATLIST_CONFIG.CATEGORY.WINDOW_SIZE}
         removeClippedSubviews={true}
-        initialNumToRender={8}
-        updateCellsBatchingPeriod={50}
+        initialNumToRender={FLATLIST_CONFIG.CATEGORY.INITIAL_NUM_TO_RENDER}
+        updateCellsBatchingPeriod={
+          FLATLIST_CONFIG.CATEGORY.UPDATE_CELLS_BATCHING_PERIOD
+        }
       />
 
       <Portal>

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
   Button,
   IconButton,
@@ -10,6 +10,7 @@ import {
 } from "react-native-paper";
 import { ExpenseType } from "../db/database";
 import { colors } from "../styles/commonStyles";
+import { showConfirm, showError } from "../utils/alertHelper";
 import { formatCurrency } from "../utils/formatCurrency";
 
 interface ExpenseTypeManagerModalProps {
@@ -21,193 +22,190 @@ interface ExpenseTypeManagerModalProps {
   onDelete: (id: number) => Promise<void>;
 }
 
-export const ExpenseTypeManagerModal: React.FC<
-  ExpenseTypeManagerModalProps
-> = ({ visible, onDismiss, expenseTypes, onCreate, onUpdate, onDelete }) => {
-  const [name, setName] = useState("");
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+export const ExpenseTypeManagerModal: React.FC<ExpenseTypeManagerModalProps> =
+  React.memo(
+    ({ visible, onDismiss, expenseTypes, onCreate, onUpdate, onDelete }) => {
+      const [name, setName] = useState("");
+      const [editingId, setEditingId] = useState<number | null>(null);
+      const [submitting, setSubmitting] = useState(false);
 
-  const resetForm = useCallback(() => {
-    setName("");
-    setEditingId(null);
-  }, []);
+      const resetForm = useCallback(() => {
+        setName("");
+        setEditingId(null);
+      }, []);
 
-  const handleDismiss = useCallback(() => {
-    resetForm();
-    onDismiss();
-  }, [onDismiss, resetForm]);
+      const handleDismiss = useCallback(() => {
+        resetForm();
+        onDismiss();
+      }, [onDismiss, resetForm]);
 
-  const actionLabel = useMemo(
-    () => (editingId ? "Simpan Perubahan" : "Tambah Jenis"),
-    [editingId]
-  );
-
-  const titleLabel = useMemo(
-    () => (editingId ? "Edit Jenis Pengeluaran" : "Jenis Pengeluaran Baru"),
-    [editingId]
-  );
-
-  const handleSubmit = useCallback(async () => {
-    if (submitting) {
-      return;
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      Alert.alert("Maaf", "Nama jenis pengeluaran tidak boleh kosong.");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      if (editingId) {
-        await onUpdate(editingId, trimmedName);
-      } else {
-        await onCreate(trimmedName);
-      }
-      resetForm();
-    } catch (error) {
-      console.error("Error saving expense type:", error);
-      Alert.alert(
-        "Error",
-        editingId
-          ? "Gagal memperbarui jenis pengeluaran."
-          : "Gagal menambahkan jenis pengeluaran."
+      const actionLabel = useMemo(
+        () => (editingId ? "Simpan Perubahan" : "Tambah Jenis"),
+        [editingId]
       );
-    } finally {
-      setSubmitting(false);
-    }
-  }, [submitting, name, editingId, onCreate, onUpdate, resetForm]);
 
-  const handleEdit = useCallback((type: ExpenseType) => {
-    if (!type.id) return;
-    setEditingId(type.id);
-    setName(type.name);
-  }, []);
+      const titleLabel = useMemo(
+        () => (editingId ? "Edit Jenis Pengeluaran" : "Jenis Pengeluaran Baru"),
+        [editingId]
+      );
 
-  const handleDelete = useCallback(
-    (type: ExpenseType) => {
-      if (!type.id || submitting) return;
+      const handleSubmit = useCallback(async () => {
+        if (submitting) {
+          return;
+        }
 
-      Alert.alert("Hapus Jenis", `Anda yakin ingin menghapus "${type.name}"?`, [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Hapus",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setSubmitting(true);
-              await onDelete(type.id!);
-              if (editingId === type.id) {
-                resetForm();
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+          showError("Nama jenis pengeluaran tidak boleh kosong.");
+          return;
+        }
+
+        try {
+          setSubmitting(true);
+          if (editingId) {
+            await onUpdate(editingId, trimmedName);
+          } else {
+            await onCreate(trimmedName);
+          }
+          resetForm();
+        } catch (error) {
+          console.error("Error saving expense type:", error);
+          showError(
+            editingId
+              ? "Gagal memperbarui jenis pengeluaran."
+              : "Gagal menambahkan jenis pengeluaran."
+          );
+        } finally {
+          setSubmitting(false);
+        }
+      }, [submitting, name, editingId, onCreate, onUpdate, resetForm]);
+
+      const handleEdit = useCallback((type: ExpenseType) => {
+        if (!type.id) return;
+        setEditingId(type.id);
+        setName(type.name);
+      }, []);
+
+      const handleDelete = useCallback(
+        (type: ExpenseType) => {
+          if (!type.id || submitting) return;
+
+          showConfirm(
+            "Hapus Jenis",
+            `Anda yakin ingin menghapus "${type.name}"?`,
+            async () => {
+              try {
+                setSubmitting(true);
+                await onDelete(type.id!);
+                if (editingId === type.id) {
+                  resetForm();
+                }
+              } catch (error) {
+                console.error("Error deleting expense type:", error);
+                showError("Gagal menghapus jenis pengeluaran.");
+              } finally {
+                setSubmitting(false);
               }
-            } catch (error) {
-              console.error("Error deleting expense type:", error);
-              Alert.alert("Error", "Gagal menghapus jenis pengeluaran.");
-            } finally {
-              setSubmitting(false);
             }
-          },
+          );
         },
-      ]);
-    },
-    [onDelete, submitting, editingId, resetForm]
-  );
+        [onDelete, submitting, editingId, resetForm]
+      );
 
-  return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={handleDismiss}
-        contentContainerStyle={styles.container}
-      >
-        <Text style={styles.title}>Kelola Jenis Pengeluaran</Text>
+      return (
+        <Portal>
+          <Modal
+            visible={visible}
+            onDismiss={handleDismiss}
+            contentContainerStyle={styles.container}
+          >
+            <Text style={styles.title}>Kelola Jenis Pengeluaran</Text>
 
-        <Text style={styles.subtitle}>{titleLabel}</Text>
-        <TextInput
-          label="Nama jenis pengeluaran"
-          value={name}
-          onChangeText={setName}
-          mode="outlined"
-          style={styles.input}
-          autoCorrect={false}
-          placeholder="Contoh: Transportasi"
-        />
+            <Text style={styles.subtitle}>{titleLabel}</Text>
+            <TextInput
+              label="Nama jenis pengeluaran"
+              value={name}
+              onChangeText={setName}
+              mode="outlined"
+              style={styles.input}
+              autoCorrect={false}
+              placeholder="Contoh: Transportasi"
+            />
 
-        <View style={styles.formActions}>
-          {editingId && (
+            <View style={styles.formActions}>
+              {editingId && (
+                <Button
+                  onPress={resetForm}
+                  mode="text"
+                  compact
+                  disabled={submitting}
+                >
+                  Batal Edit
+                </Button>
+              )}
+              <Button
+                mode="contained"
+                onPress={handleSubmit}
+                loading={submitting}
+                disabled={submitting}
+                style={styles.submitButton}
+              >
+                {actionLabel}
+              </Button>
+            </View>
+
+            <Text style={styles.listTitle}>
+              Daftar Jenis ({expenseTypes.length})
+            </Text>
+
+            {expenseTypes.length === 0 ? (
+              <Text style={styles.emptyText}>
+                Belum ada jenis pengeluaran. Tambahkan untuk mulai
+                mengelompokkan pengeluaran.
+              </Text>
+            ) : (
+              <ScrollView style={styles.listScroll} nestedScrollEnabled>
+                {expenseTypes.map((type) => (
+                  <View key={type.id} style={styles.listItem}>
+                    <View style={styles.listInfo}>
+                      <Text style={styles.listName}>{type.name}</Text>
+                      <Text style={styles.listAmount}>
+                        Total: {formatCurrency(type.total_spent)}
+                      </Text>
+                    </View>
+                    <View style={styles.listActions}>
+                      <IconButton
+                        icon="pencil"
+                        size={20}
+                        onPress={() => handleEdit(type)}
+                        accessibilityLabel={`Edit ${type.name}`}
+                      />
+                      <IconButton
+                        icon="delete"
+                        size={20}
+                        iconColor={colors.error}
+                        onPress={() => handleDelete(type)}
+                        accessibilityLabel={`Hapus ${type.name}`}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
             <Button
-              onPress={resetForm}
               mode="text"
-              compact
+              onPress={handleDismiss}
+              style={styles.closeButton}
               disabled={submitting}
             >
-              Batal Edit
+              Selesai
             </Button>
-          )}
-          <Button
-            mode="contained"
-            onPress={handleSubmit}
-            loading={submitting}
-            disabled={submitting}
-            style={styles.submitButton}
-          >
-            {actionLabel}
-          </Button>
-        </View>
-
-        <Text style={styles.listTitle}>
-          Daftar Jenis ({expenseTypes.length})
-        </Text>
-
-        {expenseTypes.length === 0 ? (
-          <Text style={styles.emptyText}>
-            Belum ada jenis pengeluaran. Tambahkan untuk mulai mengelompokkan
-            pengeluaran.
-          </Text>
-        ) : (
-          <ScrollView style={styles.listScroll} nestedScrollEnabled>
-            {expenseTypes.map((type) => (
-              <View key={type.id} style={styles.listItem}>
-                <View style={styles.listInfo}>
-                  <Text style={styles.listName}>{type.name}</Text>
-                  <Text style={styles.listAmount}>
-                    Total: {formatCurrency(type.total_spent)}
-                  </Text>
-                </View>
-                <View style={styles.listActions}>
-                  <IconButton
-                    icon="pencil"
-                    size={20}
-                    onPress={() => handleEdit(type)}
-                    accessibilityLabel={`Edit ${type.name}`}
-                  />
-                  <IconButton
-                    icon="delete"
-                    size={20}
-                    iconColor={colors.error}
-                    onPress={() => handleDelete(type)}
-                    accessibilityLabel={`Hapus ${type.name}`}
-                  />
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-
-        <Button
-          mode="text"
-          onPress={handleDismiss}
-          style={styles.closeButton}
-          disabled={submitting}
-        >
-          Selesai
-        </Button>
-      </Modal>
-    </Portal>
-  );
-};
+          </Modal>
+        </Portal>
+      );
+    }
+  ); // ✅ FIXED: Added missing closing parenthesis for React.memo
 
 const styles = StyleSheet.create({
   container: {
@@ -287,3 +285,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
+
+ExpenseTypeManagerModal.displayName = "ExpenseTypeManagerModal";

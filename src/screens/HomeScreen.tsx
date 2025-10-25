@@ -7,12 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  Alert,
-  InteractionManager,
-  ScrollView,
-  StyleSheet,
-} from "react-native";
+import { InteractionManager, ScrollView, StyleSheet } from "react-native";
 import { Appbar } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CategoryBalanceCard } from "../components/CategoryBalanceCard";
@@ -23,6 +18,7 @@ import { FinancialSummary } from "../components/FinancialSummary";
 import { useApp } from "../context/AppContext";
 import { ExpenseType } from "../db/database";
 import { colors } from "../styles/commonStyles";
+import { showWarning } from "../utils/alertHelper";
 import {
   getAllocationDeficit,
   isAllocationComplete,
@@ -289,23 +285,13 @@ export const HomeScreen: React.FC = () => {
 
     if (!isAllocationComplete(totalAllocationPercentage)) {
       const deficit = getAllocationDeficit(totalAllocationPercentage);
-      Alert.alert(
-        "Alokasi Belum Lengkap",
+      showWarning(
         `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
           1
         )}%.\n\nTambahkan alokasi sebesar ${deficit.toFixed(
           1
         )}% lagi agar mencapai 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
-        [
-          {
-            text: "OK",
-            style: "default",
-          },
-          {
-            text: "Ke Halaman Kategori",
-            onPress: () => router.push({ pathname: "/(tabs)/category" } as any),
-          },
-        ]
+        "Alokasi Belum Lengkap"
       );
       return false;
     }

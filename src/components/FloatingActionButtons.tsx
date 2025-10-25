@@ -7,10 +7,11 @@ import React, {
   useState,
   useTransition,
 } from "react";
-import { Alert, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { FAB, Portal } from "react-native-paper";
 import { useApp } from "../context/AppContext";
 import { colors } from "../styles/commonStyles";
+import { showWarning } from "../utils/alertHelper";
 import {
   getAllocationDeficit,
   isAllocationComplete,
@@ -42,26 +43,13 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
 
     if (!isAllocationComplete(totalAllocationPercentage)) {
       const deficit = getAllocationDeficit(totalAllocationPercentage);
-      Alert.alert(
-        "Alokasi Belum Lengkap",
+      showWarning(
         `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
           1
         )}%.\n\nTambahkan alokasi sebesar ${deficit.toFixed(
           1
         )}% lagi agar mencapai 100% sebelum mencatat transaksi.\n\nSilakan menuju halaman Kategori untuk menambah kategori atau mengatur ulang persentase.`,
-        [
-          {
-            text: "OK",
-            style: "default",
-          },
-          {
-            text: "Ke Halaman Kategori",
-            onPress: () => {
-              setOpen(false);
-              router.push({ pathname: "/(tabs)/category" });
-            },
-          },
-        ]
+        "Alokasi Belum Lengkap"
       );
       return false;
     }
@@ -77,7 +65,8 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
     | { pathname: "/(tabs)/category"; params?: Record<string, string> }
     | { pathname: "/(tabs)/loan"; params?: Record<string, string> };
 
-  const navigate = useCallback((target: TargetRoute) => {
+  const navigate = useCallback(
+    (target: TargetRoute) => {
       startTransition(() => {
         router.push(target);
       });
@@ -163,9 +152,7 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
         disabled: isNavigating || !hasCategories,
       },
       {
-        icon: () => (
-          <MaterialIcons name="category" size={24} color="#FFFFFF" />
-        ),
+        icon: () => <MaterialIcons name="category" size={24} color="#FFFFFF" />,
         label: "Tambah Kategori",
         onPress: handleKategoriPress,
         style: { backgroundColor: colors.category },

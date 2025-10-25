@@ -5,10 +5,10 @@ import { ActivityIndicator, Text } from "react-native-paper";
 
 export default function Index() {
   useEffect(() => {
-    // Redirect ke tabs setelah splash screen
+    // Redirect ke tabs setelah splash screen (⚡ OPTIMIZED: 1.5s dari 2s)
     const timer = setTimeout(() => {
       router.replace("/(tabs)/" as any);
-    }, 2000);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, []);
@@ -23,6 +23,10 @@ export default function Index() {
         size="large"
         style={styles.loader}
       />
+      <View style={styles.developerCredit}>
+        <Text style={styles.developText}>Develop</Text>
+        <Text style={styles.byFirdausText}> By Firdaus</Text>
+      </View>
     </View>
   );
 }
@@ -48,5 +52,21 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 20,
+  },
+  developerCredit: {
+    position: "absolute",
+    bottom: 40,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  developText: {
+    fontSize: 14,
+    color: "#000000",
+    fontWeight: "400",
+  },
+  byFirdausText: {
+    fontSize: 14,
+    color: "#2196F3",
+    fontWeight: "600",
   },
 });

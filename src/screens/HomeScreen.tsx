@@ -251,7 +251,7 @@ export const HomeScreen: React.FC = () => {
 
         setSelectedCategoryIds(topCategories);
       }
-    }, [categories])
+    }, [categories, selectedCategoryIds.length])
   );
 
   // Hitung total persentase alokasi dari semua kategori

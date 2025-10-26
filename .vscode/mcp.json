@@ -1,0 +1,52 @@
+{
+  "servers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\Projek\\catatan-keuangan"
+      ],
+      "cwd": "C:\\Projek\\catatan-keuangan",
+      "env": {
+        "ROOT": "C:\\Projek\\catatan-keuangan"
+      },
+      "version": "1.0.1"
+    },
+    "snyk": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "github:sammcj/mcp-snyk"],
+      "env": {
+        "SNYK_API_KEY": "8ba78fe9-a74b-4ac7-a5cf-f499dfa3e109",
+        "SNYK_ORG_ID": ""
+      },
+      "version": "1.0.0"
+    },
+    "owasp-zap": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["mcp-zap-server"],
+      "env": {
+        "ZAP_API_KEY": "${input:zap_api_key}",
+        "ZAP_HOST": "http://127.0.0.1",
+        "ZAP_PORT": "8080"
+      },
+      "version": "1.0.0"
+    },
+    "monkey-mcp": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "jamesmontemagno/monkeymcp:latest"],
+      "env": {}
+    }
+  },
+  "inputs": [
+    {
+      "id": "zap_api_key",
+      "type": "promptString",
+      "description": "Masukkan API key OWASP ZAP (dari konfigurasi lokal ZAP).",
+      "password": true
+    }
+  ]
+}

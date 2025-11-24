@@ -2,13 +2,14 @@ import { router } from "expo-router";
 import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { ActivityIndicator, Text } from "react-native-paper";
+import { TIMING } from "../src/utils/constants";
 
 export default function Index() {
   useEffect(() => {
     // Redirect ke tabs setelah splash screen (⚡ OPTIMIZED: 1.5s dari 2s)
     const timer = setTimeout(() => {
       router.replace("/(tabs)/" as any);
-    }, 1500);
+    }, TIMING.SPLASH_DELAY);
 
     return () => clearTimeout(timer);
   }, []);

@@ -22,6 +22,9 @@ export const TIMING = {
 
   // UI Transitions
   MODAL_TRANSITION_DELAY: 300,
+
+  // Splash Screen
+  SPLASH_DELAY: 1500,
 } as const;
 
 // ==================== FLATLIST PERFORMANCE ====================

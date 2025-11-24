@@ -252,12 +252,6 @@ export const scheduleNotification = async (
     // Simpan ID notifikasi untuk referensi
     await AsyncStorage.setItem(NOTIFICATION_ID_KEY, notificationId);
 
-    if (__DEV__) {
-      console.log(
-        `Notification scheduled for ${settings.time} (${settings.timezone})`
-      );
-    }
-
     // Untuk Android, karena menggunakan non-repeating, setup listener untuk reschedule
     if (Platform.OS === "android") {
       setupNotificationListener(settings);
@@ -334,9 +328,6 @@ export const cancelScheduledNotification = async (): Promise<void> => {
     if (notificationId) {
       await notificationModule.cancelScheduledNotificationAsync(notificationId);
       await AsyncStorage.removeItem(NOTIFICATION_ID_KEY);
-      if (__DEV__) {
-        console.log("Scheduled notification canceled");
-      }
     }
 
     // Batalkan semua notifikasi yang pending (sebagai fallback)
@@ -396,20 +387,11 @@ export const initializeNotifications = async (): Promise<void> => {
 
         await saveNotificationSettings(updatedSettings);
         await scheduleNotification(updatedSettings);
-
-        if (__DEV__) {
-          console.log(
-            `Timezone changed from ${settings.timezone} to ${currentTimezone}, notification rescheduled`
-          );
-        }
       } else {
         // Pastikan notifikasi masih aktif
         const hasScheduled = await checkScheduledNotifications();
         if (!hasScheduled) {
           await scheduleNotification(settings);
-          if (__DEV__) {
-            console.log("Notification rescheduled on app init");
-          }
         }
       }
     }
@@ -449,8 +431,5 @@ export const cleanupNotificationListener = (): void => {
   if (notificationListenerSubscription) {
     notificationListenerSubscription.remove();
     notificationListenerSubscription = null;
-    if (__DEV__) {
-      console.log("Notification listener cleaned up");
-    }
   }
 };

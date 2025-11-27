@@ -145,6 +145,11 @@ const LoanItemComponent: React.FC<LoanItemProps> = ({
               <Text style={styles.loanName}>{loan.name}</Text>
               <Text style={styles.loanCategory}>Kategori: {categoryName}</Text>
               <Text style={styles.loanDate}>{formatDate(loan.date)}</Text>
+              {loan.note && (
+                <Text style={styles.loanNote} numberOfLines={2}>
+                  📝 {loan.note}
+                </Text>
+              )}
             </View>
 
             <View style={styles.loanActions}>
@@ -286,6 +291,7 @@ export const LoanScreen: React.FC = () => {
     name: "",
     amount: "",
     categoryId: "",
+    note: "", // Catatan tujuan pinjaman
   });
 
   // Handle floating action button actions
@@ -320,6 +326,7 @@ export const LoanScreen: React.FC = () => {
       name: "",
       amount: "",
       categoryId: "",
+      note: "",
     });
   };
 
@@ -376,6 +383,7 @@ export const LoanScreen: React.FC = () => {
         category_id: parseInt(formData.categoryId),
         status: "unpaid" as const,
         date: getTodayString(),
+        note: formData.note.trim() || undefined,
       };
 
       await addLoan(loanData);
@@ -635,6 +643,17 @@ export const LoanScreen: React.FC = () => {
             />
 
             <TextInput
+              label="Catatan Tujuan Pinjaman (Opsional)"
+              value={formData.note}
+              onChangeText={(text) => setFormData({ ...formData, note: text })}
+              style={styles.input}
+              mode="outlined"
+              placeholder="Contoh: Modal usaha, Biaya kuliah, Keperluan darurat"
+              multiline
+              numberOfLines={3}
+            />
+
+            <TextInput
               label="Jumlah Pinjaman"
               value={formData.amount}
               onChangeText={(text) => {
@@ -859,6 +878,12 @@ const styles = StyleSheet.create({
   loanDate: {
     fontSize: 12,
     color: "#999999",
+  },
+  loanNote: {
+    fontSize: 13,
+    color: "#2196F3",
+    marginTop: 4,
+    fontStyle: "italic",
   },
   loanActions: {
     alignItems: "flex-end",

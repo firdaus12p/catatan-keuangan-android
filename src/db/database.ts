@@ -28,6 +28,7 @@ export interface Loan {
   category_id: number;
   status: "unpaid" | "half" | "paid";
   date: string;
+  note?: string; // Catatan tujuan pinjaman
 }
 
 // Interface untuk tabel loan_payments (tracking pembayaran)
@@ -128,9 +129,16 @@ class Database {
           category_id INTEGER NOT NULL,
           status TEXT NOT NULL CHECK (status IN ('unpaid', 'half', 'paid')),
           date TEXT NOT NULL,
+          note TEXT,
           FOREIGN KEY (category_id) REFERENCES categories (id)
         );
       `);
+
+      // Migration: Add note column jika belum ada (backward compatibility)
+      const hasNoteColumn = await this.tableHasColumn("loans", "note");
+      if (!hasNoteColumn) {
+        await this.db.execAsync("ALTER TABLE loans ADD COLUMN note TEXT");
+      }
 
       // Buat tabel loan_payments untuk tracking pembayaran
       await this.db.execAsync(`
@@ -706,8 +714,15 @@ class Database {
       let insertedId = 0;
       await this.db.withExclusiveTransactionAsync(async (txn) => {
         const result = await txn.runAsync(
-          "INSERT INTO loans (name, amount, category_id, status, date) VALUES (?, ?, ?, ?, ?)",
-          [loan.name, loan.amount, loan.category_id, loan.status, loan.date]
+          "INSERT INTO loans (name, amount, category_id, status, date, note) VALUES (?, ?, ?, ?, ?, ?)",
+          [
+            loan.name,
+            loan.amount,
+            loan.category_id,
+            loan.status,
+            loan.date,
+            loan.note || null,
+          ]
         );
         insertedId = result.lastInsertRowId;
 

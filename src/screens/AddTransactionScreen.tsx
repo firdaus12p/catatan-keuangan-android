@@ -28,12 +28,9 @@ import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
 import { TransactionItem } from "../components/TransactionItem";
 import { useApp } from "../context/AppContext";
 import { Transaction } from "../db/database";
+import { useAllocationValidator } from "../hooks/useAllocationValidator";
 import { colors } from "../styles/commonStyles";
 import { showConfirm, showError, showSuccess } from "../utils/alertHelper";
-import {
-  getAllocationDeficit,
-  isAllocationComplete,
-} from "../utils/allocation";
 import { FLATLIST_CONFIG } from "../utils/constants";
 import {
   formatDate,
@@ -91,6 +88,43 @@ export const AddTransactionScreen: React.FC = () => {
     useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Gunakan custom hook untuk validasi alokasi
+  const { validateAllocationForTransaction } = useAllocationValidator();
+
+  const resetForm = useCallback(() => {
+    setFormData({
+      amount: "",
+      categoryId: "",
+      note: "",
+      expenseTypeId: "",
+    });
+    setIsGlobalIncome(false);
+    setSelectedCategoryIds([]);
+    setTransactionType("income");
+  }, []);
+
+  const openModal = useCallback(
+    (type: "income" | "expense") => {
+      // Validasi alokasi sebelum membuka modal
+      if (!validateAllocationForTransaction()) {
+        return;
+      }
+
+      resetForm();
+      setTransactionType(type);
+      if (type === "income") {
+        setIsGlobalIncome(true); // Default ke global income
+      }
+      setModalVisible(true);
+    },
+    [resetForm, validateAllocationForTransaction]
+  );
+
+  const closeModal = useCallback(() => {
+    setModalVisible(false);
+    resetForm();
+  }, [resetForm]);
+
   // Handle floating action button actions
   useEffect(() => {
     if (action === "income") {
@@ -102,7 +136,7 @@ export const AddTransactionScreen: React.FC = () => {
       // Clear parameter setelah digunakan
       router.replace("/(tabs)/transaction");
     }
-  }, [action]);
+  }, [action, router, openModal]);
 
   // Refresh data saat screen difokuskan
   useFocusEffect(
@@ -136,71 +170,6 @@ export const AddTransactionScreen: React.FC = () => {
       }));
     }
   }, [transactionType, formData.expenseTypeId]);
-
-  // Hitung total persentase alokasi dari semua kategori
-  const hasCategories = categories.length > 0;
-  const totalAllocationPercentage = useMemo(() => {
-    return categories.reduce((sum, cat) => sum + cat.percentage, 0);
-  }, [categories]);
-
-  // Validasi total alokasi sebelum membuka modal
-  const validateAllocation = useCallback(() => {
-    if (!hasCategories) {
-      return true;
-    }
-
-    if (!isAllocationComplete(totalAllocationPercentage)) {
-      const deficit = getAllocationDeficit(totalAllocationPercentage);
-      showConfirm(
-        "Alokasi Belum Lengkap",
-        `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
-          1
-        )}%.\n\nTambahkan alokasi sebesar ${deficit.toFixed(
-          1
-        )}% lagi agar mencapai 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
-        () => router.push("/(tabs)/category"),
-        undefined,
-        "Ke Halaman Kategori",
-        "OK"
-      );
-      return false;
-    }
-    return true;
-  }, [hasCategories, router, totalAllocationPercentage]);
-
-  const resetForm = useCallback(() => {
-    setFormData({
-      amount: "",
-      categoryId: "",
-      note: "",
-      expenseTypeId: "",
-    });
-    setIsGlobalIncome(false);
-    setSelectedCategoryIds([]);
-    setTransactionType("income");
-  }, []);
-
-  const openModal = useCallback(
-    (type: "income" | "expense") => {
-      // Validasi alokasi sebelum membuka modal
-      if (!validateAllocation()) {
-        return;
-      }
-
-      resetForm();
-      setTransactionType(type);
-      if (type === "income") {
-        setIsGlobalIncome(true); // Default ke global income
-      }
-      setModalVisible(true);
-    },
-    [resetForm]
-  );
-
-  const closeModal = useCallback(() => {
-    setModalVisible(false);
-    resetForm();
-  }, [resetForm]);
 
   const validateForm = useCallback((): boolean => {
     const amount = parseNumberInput(formData.amount);
@@ -321,7 +290,7 @@ export const AddTransactionScreen: React.FC = () => {
     if (!validateForm()) return;
 
     // Validasi alokasi sebelum menyimpan transaksi
-    if (!validateAllocation()) {
+    if (!validateAllocationForTransaction()) {
       return;
     }
 
@@ -368,7 +337,7 @@ export const AddTransactionScreen: React.FC = () => {
   }, [
     saving,
     validateForm,
-    validateAllocation,
+    validateAllocationForTransaction,
     formData,
     transactionType,
     isGlobalIncome,

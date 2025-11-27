@@ -17,12 +17,8 @@ import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
 import { FinancialSummary } from "../components/FinancialSummary";
 import { useApp } from "../context/AppContext";
 import { ExpenseType } from "../db/database";
+import { useAllocationValidator } from "../hooks/useAllocationValidator";
 import { colors } from "../styles/commonStyles";
-import { showWarning } from "../utils/alertHelper";
-import {
-  getAllocationDeficit,
-  isAllocationComplete,
-} from "../utils/allocation";
 import { TIMING } from "../utils/constants";
 import { getCurrentMonthYear, getMonthName } from "../utils/dateHelper";
 
@@ -167,12 +163,6 @@ export const HomeScreen: React.FC = () => {
     [animatedCategory1Balance, animatedCategory2Balance]
   );
 
-  useEffect(() => {
-    router.prefetch("/(tabs)/transaction");
-    router.prefetch("/(tabs)/category");
-    router.prefetch("/(tabs)/loan");
-  }, [router]);
-
   const resolvePeriodDate = useCallback((period: "current" | "previous") => {
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
@@ -254,11 +244,9 @@ export const HomeScreen: React.FC = () => {
     }, [categories, selectedCategoryIds.length])
   );
 
-  // Hitung total persentase alokasi dari semua kategori
-  const hasCategories = categories.length > 0;
-  const totalAllocationPercentage = useMemo(() => {
-    return categories.reduce((sum, cat) => sum + cat.percentage, 0);
-  }, [categories]);
+  // Gunakan custom hook untuk validasi alokasi
+  const { hasCategories, validateAllocationForNavigation } =
+    useAllocationValidator();
 
   // Helper functions untuk kategori selector dengan useCallback
   const handleCategoryToggle = useCallback((categoryId: number) => {
@@ -276,27 +264,6 @@ export const HomeScreen: React.FC = () => {
   const toggleCategorySelector = useCallback(() => {
     setShowCategorySelector((prev) => !prev);
   }, []);
-
-  // Validasi total alokasi sebelum membuka halaman transaksi
-  const validateAllocation = useCallback(() => {
-    if (!hasCategories) {
-      return true;
-    }
-
-    if (!isAllocationComplete(totalAllocationPercentage)) {
-      const deficit = getAllocationDeficit(totalAllocationPercentage);
-      showWarning(
-        `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
-          1
-        )}%.\n\nTambahkan alokasi sebesar ${deficit.toFixed(
-          1
-        )}% lagi agar mencapai 100% sebelum dapat menginput transaksi.\n\nSilakan pergi ke halaman Kategori untuk menambah kategori atau mengatur ulang persentase alokasi.`,
-        "Alokasi Belum Lengkap"
-      );
-      return false;
-    }
-    return true;
-  }, [hasCategories, router, totalAllocationPercentage]);
 
   const openExpenseTypeManager = useCallback(() => {
     InteractionManager.runAfterInteractions(() => {
@@ -334,7 +301,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleTransactionNavigation = useCallback(
     (type: "income" | "expense") => {
-      if (!validateAllocation()) {
+      if (!validateAllocationForNavigation()) {
         return;
       }
 
@@ -343,7 +310,7 @@ export const HomeScreen: React.FC = () => {
         params: { action: type },
       } as any);
     },
-    [validateAllocation, router]
+    [validateAllocationForNavigation, router]
   );
 
   const handlePeriodChange = useCallback(

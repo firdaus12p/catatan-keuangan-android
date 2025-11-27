@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   InteractionManager,
@@ -52,11 +52,6 @@ export const CategoryScreen: React.FC = () => {
   const { action } = useLocalSearchParams<{ action?: string }>();
   const router = useRouter();
 
-  useEffect(() => {
-    router.prefetch({ pathname: "/(tabs)/transaction" });
-    router.prefetch({ pathname: "/(tabs)/loan" });
-  }, [router]);
-
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({
@@ -70,6 +65,21 @@ export const CategoryScreen: React.FC = () => {
   const [transferAmount, setTransferAmount] = useState("");
   const [transferLoading, setTransferLoading] = useState(false);
 
+  const resetForm = useCallback(() => {
+    setFormData({ name: "", percentage: "" });
+    setEditingCategory(null);
+  }, []);
+
+  const openAddModal = useCallback(() => {
+    resetForm();
+    setModalVisible(true);
+  }, [resetForm]);
+
+  useEffect(() => {
+    router.prefetch({ pathname: "/(tabs)/transaction" });
+    router.prefetch({ pathname: "/(tabs)/loan" });
+  }, [router]);
+
   // Handle floating action button actions
   useEffect(() => {
     if (action === "add") {
@@ -77,7 +87,7 @@ export const CategoryScreen: React.FC = () => {
       // Clear parameter setelah digunakan
       router.replace("/(tabs)/category");
     }
-  }, [action]);
+  }, [action, router, openAddModal]);
 
   // Refresh data saat screen difokuskan
   useFocusEffect(
@@ -96,16 +106,6 @@ export const CategoryScreen: React.FC = () => {
       };
     }, [loadCategories])
   );
-
-  const resetForm = () => {
-    setFormData({ name: "", percentage: "" });
-    setEditingCategory(null);
-  };
-
-  const openAddModal = () => {
-    resetForm();
-    setModalVisible(true);
-  };
 
   const openEditModal = (category: Category) => {
     setEditingCategory(category);

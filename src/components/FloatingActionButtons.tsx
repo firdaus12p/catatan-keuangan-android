@@ -9,52 +9,23 @@ import React, {
 } from "react";
 import { StyleSheet } from "react-native";
 import { FAB, Portal } from "react-native-paper";
-import { useApp } from "../context/AppContext";
+import { useAllocationValidator } from "../hooks/useAllocationValidator";
 import { colors } from "../styles/commonStyles";
-import { showWarning } from "../utils/alertHelper";
-import {
-  getAllocationDeficit,
-  isAllocationComplete,
-} from "../utils/allocation";
 
 export const FloatingActionButtons: React.FC = React.memo(() => {
   const [open, setOpen] = useState(false);
   const [isNavigating, startTransition] = useTransition();
   const router = useRouter();
-  const { categories } = useApp();
-  const hasCategories = categories.length > 0;
+
+  // Gunakan custom hook untuk validasi alokasi
+  const { hasCategories, validateAllocationForNavigation } =
+    useAllocationValidator();
 
   useEffect(() => {
     router.prefetch({ pathname: "/(tabs)/transaction" });
     router.prefetch({ pathname: "/(tabs)/category" });
     router.prefetch({ pathname: "/(tabs)/loan" });
   }, [router]);
-
-  // Hitung total persentase alokasi dari semua kategori
-  const totalAllocationPercentage = useMemo(() => {
-    return categories.reduce((sum, cat) => sum + cat.percentage, 0);
-  }, [categories]);
-
-  // Validasi total alokasi sebelum membuka halaman transaksi
-  const validateAllocation = useCallback(() => {
-    if (!hasCategories) {
-      return true;
-    }
-
-    if (!isAllocationComplete(totalAllocationPercentage)) {
-      const deficit = getAllocationDeficit(totalAllocationPercentage);
-      showWarning(
-        `Total alokasi kategori saat ini ${totalAllocationPercentage.toFixed(
-          1
-        )}%.\n\nTambahkan alokasi sebesar ${deficit.toFixed(
-          1
-        )}% lagi agar mencapai 100% sebelum mencatat transaksi.\n\nSilakan menuju halaman Kategori untuk menambah kategori atau mengatur ulang persentase.`,
-        "Alokasi Belum Lengkap"
-      );
-      return false;
-    }
-    return true;
-  }, [hasCategories, router, totalAllocationPercentage]);
 
   const onStateChange = useCallback(({ open }: { open: boolean }) => {
     setOpen(open);
@@ -75,7 +46,7 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
   );
 
   const handlePemasukanPress = useCallback(() => {
-    if (!validateAllocation()) {
+    if (!validateAllocationForNavigation()) {
       setOpen(false);
       return;
     }
@@ -85,10 +56,10 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
       pathname: "/(tabs)/transaction",
       params: { action: "income" },
     });
-  }, [navigate, validateAllocation]);
+  }, [navigate, validateAllocationForNavigation]);
 
   const handlePengeluaranPress = useCallback(() => {
-    if (!validateAllocation()) {
+    if (!validateAllocationForNavigation()) {
       setOpen(false);
       return;
     }
@@ -98,7 +69,7 @@ export const FloatingActionButtons: React.FC = React.memo(() => {
       pathname: "/(tabs)/transaction",
       params: { action: "expense" },
     });
-  }, [navigate, validateAllocation]);
+  }, [navigate, validateAllocationForNavigation]);
 
   const handlePinjamanPress = useCallback(() => {
     setOpen(false);

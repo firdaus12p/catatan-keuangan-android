@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
-import { BarChart, PieChart } from "react-native-chart-kit";
+import { PieChart } from "react-native-chart-kit";
 import { Card } from "react-native-paper";
 import { Category } from "../db/database";
 import { colors } from "../styles/commonStyles";
@@ -10,18 +10,8 @@ import { CHART, CHART_COLORS } from "../utils/constants";
 const screenWidth = Dimensions.get("window").width;
 
 interface ExpenseChartsProps {
-  totalIncome: number;
-  totalExpense: number;
   categories: Category[];
 }
-
-// Memoized BarChart wrapper
-const MemoizedBarChart = React.memo(BarChart, (prevProps, nextProps) => {
-  return (
-    prevProps.data.datasets[0].data[0] === nextProps.data.datasets[0].data[0] &&
-    prevProps.data.datasets[0].data[1] === nextProps.data.datasets[0].data[1]
-  );
-});
 
 // Memoized PieChart wrapper
 const MemoizedPieChart = React.memo(PieChart, (prevProps, nextProps) => {
@@ -34,7 +24,7 @@ const MemoizedPieChart = React.memo(PieChart, (prevProps, nextProps) => {
 });
 
 export const ExpenseCharts = React.memo<ExpenseChartsProps>(
-  ({ totalIncome, totalExpense, categories }) => {
+  ({ categories }) => {
     const chartConfig = {
       backgroundColor: "#FFFFFF",
       backgroundGradientFrom: "#FFFFFF",
@@ -46,23 +36,6 @@ export const ExpenseCharts = React.memo<ExpenseChartsProps>(
         borderRadius: 16,
       },
     };
-
-    // Data untuk Income vs Expense Chart dengan memoization
-    const incomeExpenseData = useMemo(
-      () => ({
-        labels: ["Pemasukan", "Pengeluaran"],
-        datasets: [
-          {
-            data: [totalIncome || 1, totalExpense || 1],
-            colors: [
-              (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
-              (opacity = 1) => `rgba(244, 67, 54, ${opacity})`,
-            ],
-          },
-        ],
-      }),
-      [totalIncome, totalExpense]
-    );
 
     // Data untuk Category Balance Chart dengan memoization
     const categoriesWithBalance = useMemo(
@@ -100,72 +73,38 @@ export const ExpenseCharts = React.memo<ExpenseChartsProps>(
     );
 
     return (
-      <View>
-        {/* Income vs Expense Chart */}
-        <Card style={styles.chartCard} elevation={2}>
-          <Card.Content>
-            <Text style={styles.sectionTitle}>Pemasukan & Pengeluaran</Text>
-            <View style={styles.chartContainer}>
-              {totalIncome > 0 || totalExpense > 0 ? (
-                <MemoizedBarChart
-                  data={incomeExpenseData}
-                  width={screenWidth - 60}
-                  height={CHART.DEFAULT_HEIGHT}
-                  chartConfig={chartConfig}
-                  style={styles.chart}
-                  yAxisLabel=""
-                  yAxisSuffix=""
-                  fromZero={true}
-                  showValuesOnTopOfBars={true}
-                />
-              ) : (
-                <View style={styles.emptyChartContainer}>
-                  <MaterialIcons name="bar-chart" size={48} color="#CCCCCC" />
-                  <Text style={styles.emptyChartText}>
-                    Data keuangan belum ada
-                  </Text>
-                </View>
-              )}
-            </View>
-          </Card.Content>
-        </Card>
-
-        {/* Category Balance Chart */}
-        <Card style={styles.chartCard} elevation={2}>
-          <Card.Content>
-            <Text style={styles.sectionTitle}>Distribusi Saldo Kategori</Text>
-            <View style={styles.chartContainer}>
-              {categoriesWithBalance.length > 0 ? (
-                <MemoizedPieChart
-                  data={categoryBalanceData}
-                  width={screenWidth - 10}
-                  height={CHART.DEFAULT_HEIGHT}
-                  chartConfig={chartConfig}
-                  accessor="population"
-                  backgroundColor="transparent"
-                  paddingLeft="5"
-                  center={[20, 0]}
-                  style={styles.chart}
-                />
-              ) : (
-                <View style={styles.emptyChartContainer}>
-                  <MaterialIcons name="pie-chart" size={48} color="#CCCCCC" />
-                  <Text style={styles.emptyChartText}>
-                    Data keuangan belum ada
-                  </Text>
-                </View>
-              )}
-            </View>
-          </Card.Content>
-        </Card>
-      </View>
+      <Card style={styles.chartCard} elevation={2}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Distribusi Saldo Kategori</Text>
+          <View style={styles.chartContainer}>
+            {categoriesWithBalance.length > 0 ? (
+              <MemoizedPieChart
+                data={categoryBalanceData}
+                width={screenWidth - 10}
+                height={CHART.DEFAULT_HEIGHT}
+                chartConfig={chartConfig}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="5"
+                center={[20, 0]}
+                style={styles.chart}
+              />
+            ) : (
+              <View style={styles.emptyChartContainer}>
+                <MaterialIcons name="pie-chart" size={48} color="#CCCCCC" />
+                <Text style={styles.emptyChartText}>
+                  Data keuangan belum ada
+                </Text>
+              </View>
+            )}
+          </View>
+        </Card.Content>
+      </Card>
     );
   },
   (prevProps, nextProps) => {
     // Custom comparison untuk mencegah re-render tidak perlu
     return (
-      prevProps.totalIncome === nextProps.totalIncome &&
-      prevProps.totalExpense === nextProps.totalExpense &&
       prevProps.categories.length === nextProps.categories.length &&
       prevProps.categories.every(
         (cat, idx) => cat.balance === nextProps.categories[idx].balance

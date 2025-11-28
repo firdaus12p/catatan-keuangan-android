@@ -1,9 +1,8 @@
-// Format angka menjadi format mata uang Rupiah
+// Format angka menjadi format mata uang Rupiah (tanpa desimal, gaya santai)
 export const formatCurrency = (amount: number): string => {
-  const hasFraction = Math.abs(amount % 1) > Number.EPSILON;
   const formatter = new Intl.NumberFormat("id-ID", {
-    minimumFractionDigits: hasFraction ? 2 : 0,
-    maximumFractionDigits: hasFraction ? 2 : 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 
   const formatted = formatter.format(Math.abs(amount));

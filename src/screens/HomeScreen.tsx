@@ -374,11 +374,7 @@ export const HomeScreen: React.FC = () => {
           onCategoryToggle={handleCategoryToggle}
         />
 
-        <ExpenseCharts
-          totalIncome={monthlyStats.totalIncome}
-          totalExpense={monthlyStats.totalExpense}
-          categories={categories}
-        />
+        <ExpenseCharts categories={categories} />
 
         <ExpenseTypeHighlight
           expenseTypeBreakdown={expenseTypeBreakdown}

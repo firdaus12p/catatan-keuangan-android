@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "catatan-keuangan",
+    "name": "Kemenku",
     "slug": "catatan-keuangan",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,12 +14,7 @@
     "android": {
       "package": "com.firdaus12p.kemenku",
       "versionCode": 1,
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
+      "icon": "./assets/images/icon.png",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [

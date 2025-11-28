@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
@@ -676,7 +677,16 @@ export const LoanScreen: React.FC = () => {
                 value={formData.categoryId}
               >
                 {categories.map((category) => (
-                  <View key={category.id} style={styles.categoryItem}>
+                  <TouchableOpacity
+                    key={category.id}
+                    style={styles.categoryItem}
+                    onPress={() =>
+                      setFormData({
+                        ...formData,
+                        categoryId: category.id!.toString(),
+                      })
+                    }
+                  >
                     <RadioButton value={category.id!.toString()} />
                     <View style={styles.categoryInfo}>
                       <Text style={styles.categoryName}>{category.name}</Text>
@@ -684,7 +694,7 @@ export const LoanScreen: React.FC = () => {
                         Saldo: {formatCurrency(category.balance)}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </RadioButton.Group>
             </View>

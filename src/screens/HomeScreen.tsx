@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import React, {
@@ -92,6 +93,7 @@ export const HomeScreen: React.FC = () => {
   );
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [isLoadingSelection, setIsLoadingSelection] = useState(true);
   const [showCategorySelector, setShowCategorySelector] = useState(false);
   const [expenseTypeManagerVisible, setExpenseTypeManagerVisible] =
     useState(false);
@@ -229,10 +231,33 @@ export const HomeScreen: React.FC = () => {
     ])
   );
 
-  // Auto-select top 2 categories with highest balance as default
+  // Load saved category selection dari AsyncStorage
+  useEffect(() => {
+    const loadSavedSelection = async () => {
+      try {
+        const saved = await AsyncStorage.getItem("@selectedCategoryIds");
+        if (saved) {
+          const parsed = JSON.parse(saved) as number[];
+          setSelectedCategoryIds(parsed);
+        }
+      } catch (error) {
+        console.error("Error loading selected categories:", error);
+      } finally {
+        setIsLoadingSelection(false);
+      }
+    };
+
+    loadSavedSelection();
+  }, []);
+
+  // Auto-select top 2 categories with highest balance as default (hanya jika belum ada saved selection)
   useFocusEffect(
     React.useCallback(() => {
-      if (categories.length > 0 && selectedCategoryIds.length === 0) {
+      if (
+        !isLoadingSelection &&
+        categories.length > 0 &&
+        selectedCategoryIds.length === 0
+      ) {
         const topCategories = categories
           .filter((cat) => cat.balance > 0 && cat.id)
           .sort((a, b) => b.balance - a.balance)
@@ -241,7 +266,7 @@ export const HomeScreen: React.FC = () => {
 
         setSelectedCategoryIds(topCategories);
       }
-    }, [categories, selectedCategoryIds.length])
+    }, [categories, selectedCategoryIds.length, isLoadingSelection])
   );
 
   // Gunakan custom hook untuk validasi alokasi
@@ -252,12 +277,25 @@ export const HomeScreen: React.FC = () => {
   const handleCategoryToggle = useCallback((categoryId: number) => {
     setSelectedCategoryIds((prev) => {
       const isSelected = prev.includes(categoryId);
+      let newSelection: number[];
+
       if (isSelected) {
-        return prev.filter((id) => id !== categoryId);
+        newSelection = prev.filter((id) => id !== categoryId);
       } else if (prev.length < 2) {
-        return [...prev, categoryId];
+        newSelection = [...prev, categoryId];
+      } else {
+        return prev;
       }
-      return prev;
+
+      // Save ke AsyncStorage
+      AsyncStorage.setItem(
+        "@selectedCategoryIds",
+        JSON.stringify(newSelection)
+      ).catch((error) =>
+        console.error("Error saving selected categories:", error)
+      );
+
+      return newSelection;
     });
   }, []);
 

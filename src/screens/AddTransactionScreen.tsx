@@ -329,8 +329,9 @@ export const AddTransactionScreen: React.FC = () => {
       closeModal();
       showSuccess("Transaksi berhasil ditambahkan");
     } catch (error) {
-      showError("Gagal menambahkan transaksi");
-      console.error("Error saving transaction:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Gagal menambahkan transaksi";
+      showError(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -718,7 +719,16 @@ export const AddTransactionScreen: React.FC = () => {
                     value={formData.categoryId}
                   >
                     {categories.map((category) => (
-                      <View key={category.id} style={styles.categoryItem}>
+                      <TouchableOpacity
+                        key={category.id}
+                        style={styles.categoryItem}
+                        onPress={() =>
+                          setFormData({
+                            ...formData,
+                            categoryId: category.id!.toString(),
+                          })
+                        }
+                      >
                         <RadioButton value={category.id!.toString()} />
                         <View style={styles.categoryInfo}>
                           <Text style={styles.categoryName}>
@@ -728,7 +738,7 @@ export const AddTransactionScreen: React.FC = () => {
                             Saldo: {formatCurrency(category.balance)}
                           </Text>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     ))}
                   </RadioButton.Group>
                 )}
@@ -761,7 +771,16 @@ export const AddTransactionScreen: React.FC = () => {
                     value={formData.expenseTypeId}
                   >
                     {expenseTypes.map((type) => (
-                      <View key={type.id} style={styles.expenseTypeItem}>
+                      <TouchableOpacity
+                        key={type.id}
+                        style={styles.expenseTypeItem}
+                        onPress={() =>
+                          setFormData({
+                            ...formData,
+                            expenseTypeId: type.id!.toString(),
+                          })
+                        }
+                      >
                         <RadioButton value={type.id!.toString()} />
                         <View style={styles.expenseTypeInfo}>
                           <Text style={styles.expenseTypeName}>
@@ -771,7 +790,7 @@ export const AddTransactionScreen: React.FC = () => {
                             Total: {formatCurrency(type.total_spent)}
                           </Text>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     ))}
                   </RadioButton.Group>
                 ) : (
@@ -1127,8 +1146,6 @@ const styles = StyleSheet.create({
   },
   selectedCategoryItem: {
     backgroundColor: "#E3F2FD",
-    borderColor: colors.income,
-    borderWidth: 1,
   },
   selectedCategoryName: {
     color: colors.income,

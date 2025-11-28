@@ -1,7 +1,13 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import {
   Button,
   Card,
@@ -171,7 +177,10 @@ export const ResetScreen: React.FC = () => {
 
             {/* Options */}
             <View style={styles.optionsContainer}>
-              <View style={styles.optionItem}>
+              <TouchableOpacity
+                style={styles.optionItem}
+                onPress={() => handleSelectOption("transactions")}
+              >
                 <Checkbox
                   status={
                     selectedOptions.transactions ? "checked" : "unchecked"
@@ -184,9 +193,12 @@ export const ResetScreen: React.FC = () => {
                     Hapus semua transaksi pemasukan dan pengeluaran
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
-              <View style={styles.optionItem}>
+              <TouchableOpacity
+                style={styles.optionItem}
+                onPress={() => handleSelectOption("loans")}
+              >
                 <Checkbox
                   status={selectedOptions.loans ? "checked" : "unchecked"}
                   onPress={() => handleSelectOption("loans")}
@@ -197,9 +209,12 @@ export const ResetScreen: React.FC = () => {
                     Hapus semua data pinjaman (utang/piutang)
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
-              <View style={styles.optionItem}>
+              <TouchableOpacity
+                style={styles.optionItem}
+                onPress={() => handleSelectOption("categories")}
+              >
                 <Checkbox
                   status={selectedOptions.categories ? "checked" : "unchecked"}
                   onPress={() => handleSelectOption("categories")}
@@ -210,9 +225,12 @@ export const ResetScreen: React.FC = () => {
                     Hapus semua kategori keuangan
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
-              <View style={styles.optionItem}>
+              <TouchableOpacity
+                style={styles.optionItem}
+                onPress={() => handleSelectOption("balances")}
+              >
                 <Checkbox
                   status={selectedOptions.balances ? "checked" : "unchecked"}
                   onPress={() => handleSelectOption("balances")}
@@ -223,7 +241,7 @@ export const ResetScreen: React.FC = () => {
                     Reset saldo semua kategori ke nol
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             </View>
 
             <Button

@@ -374,7 +374,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           loadMonthlyStats(now.getFullYear(), now.getMonth() + 1), // Refresh statistik bulan ini
         ]);
       } catch (error) {
-        console.error("Error adding global income:", error);
         throw error;
       }
     },
@@ -395,7 +394,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           loadMonthlyStats(now.getFullYear(), now.getMonth() + 1), // Refresh statistik bulan ini
         ]);
       } catch (error) {
-        console.error("Error adding multi category income:", error);
         throw error;
       }
     },

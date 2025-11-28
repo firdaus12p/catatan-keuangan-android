@@ -595,6 +595,14 @@ class Database {
     if (!this.db) throw new Error("Database not initialized");
     try {
       const categories = await this.getAllCategories();
+
+      // Validasi: pastikan ada kategori
+      if (categories.length === 0) {
+        throw new Error(
+          "Tidak ada kategori. Buat kategori terlebih dahulu sebelum menambahkan transaksi."
+        );
+      }
+
       const date = new Date().toISOString();
 
       // Bagi pemasukan ke semua kategori berdasarkan persentase
@@ -621,7 +629,6 @@ class Database {
         }
       });
     } catch (error) {
-      console.error("Error adding global income:", error);
       throw error;
     }
   }
@@ -642,6 +649,13 @@ class Database {
     try {
       // Ambil kategori yang dipilih beserta persentasenya
       const categories = await this.getAllCategories();
+
+      // Validasi: pastikan ada kategori
+      if (categories.length === 0) {
+        throw new Error(
+          "Tidak ada kategori. Buat kategori terlebih dahulu sebelum menambahkan transaksi."
+        );
+      }
       const selectedCategories = categories.filter((cat) =>
         categoryIds.includes(cat.id!)
       );
@@ -688,7 +702,6 @@ class Database {
         }
       });
     } catch (error) {
-      console.error("Error adding multi category income:", error);
       throw error;
     }
   }

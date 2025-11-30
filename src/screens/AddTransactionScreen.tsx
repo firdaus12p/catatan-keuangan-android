@@ -53,9 +53,11 @@ export const AddTransactionScreen: React.FC = () => {
   const {
     categories,
     transactions,
+    hasMoreTransactions, // ✅ PAGINATION
     expenseTypes,
     loadCategories,
     loadTransactions,
+    loadMoreTransactions, // ✅ PAGINATION
     loadExpenseTypes,
     loadAllData,
     addTransaction,
@@ -89,9 +91,28 @@ export const AddTransactionScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [showHistory, setShowHistory] = useState(false); // Toggle show/hide history
   const [historyLimit, setHistoryLimit] = useState(10); // Default 10 transaksi
+  const [isLoadingMore, setIsLoadingMore] = useState(false); // ✅ PAGINATION: Loading state
 
   // Gunakan custom hook untuk validasi alokasi
   const { validateAllocationForTransaction } = useAllocationValidator();
+
+  // ✅ PAGINATION: Handle load more for infinite scroll
+  const handleLoadMore = useCallback(async () => {
+    // Jangan load jika sedang loading, tidak ada data lagi, atau filter aktif
+    // NOTE: Infinite scroll hanya aktif saat filter="all" karena filtering dilakukan client-side
+    // Saat filter current/previous, data sudah lengkap dari initial load
+    if (isLoadingMore || !hasMoreTransactions || filter !== "all") return;
+
+    setIsLoadingMore(true);
+    try {
+      await loadMoreTransactions();
+    } catch (error) {
+      console.error("Error loading more transactions:", error);
+      showError("Gagal memuat transaksi tambahan");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, hasMoreTransactions, filter, loadMoreTransactions]);
 
   const resetForm = useCallback(() => {
     setFormData({
@@ -596,6 +617,16 @@ export const AddTransactionScreen: React.FC = () => {
         initialNumToRender={FLATLIST_CONFIG.DEFAULT.INITIAL_NUM_TO_RENDER}
         updateCellsBatchingPeriod={
           FLATLIST_CONFIG.DEFAULT.UPDATE_CELLS_BATCHING_PERIOD
+        }
+        // ✅ PAGINATION: Infinite scroll
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          isLoadingMore ? (
+            <View style={styles.loadingFooter}>
+              <Text style={styles.loadingText}>Memuat transaksi...</Text>
+            </View>
+          ) : null
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -1244,6 +1275,17 @@ const styles = StyleSheet.create({
     marginHorizontal: 32,
     marginTop: 12,
     borderRadius: 1,
+  },
+  // ✅ PAGINATION: Loading footer styles
+  loadingFooter: {
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#666666",
+    fontStyle: "italic",
   },
   multiSelectContainer: {
     gap: 8,

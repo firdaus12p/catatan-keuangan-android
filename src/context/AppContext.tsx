@@ -68,7 +68,13 @@ interface AppContextType {
 
   // Transactions
   transactions: Transaction[];
-  loadTransactions: (limit?: number, offset?: number) => Promise<void>;
+  hasMoreTransactions: boolean; // ✅ PAGINATION: Track if more data available
+  loadTransactions: (
+    limit?: number,
+    offset?: number,
+    append?: boolean
+  ) => Promise<void>;
+  loadMoreTransactions: () => Promise<void>; // ✅ PAGINATION: Load next batch
   addTransaction: (transaction: Omit<Transaction, "id">) => Promise<void>;
   addGlobalIncome: (amount: number, note?: string) => Promise<void>;
   addMultiCategoryIncome: (
@@ -128,12 +134,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [hasMoreTransactions, setHasMoreTransactions] = useState(true); // ✅ PAGINATION
+  const transactionOffsetRef = useRef(0); // ✅ PAGINATION: Track current offset
   const [loans, setLoans] = useState<Loan[]>([]);
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats>(
     createEmptyStats()
   );
   const [totalAllTimeBalance, setTotalAllTimeBalance] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Flag untuk cleanup transaksi lama (hanya sekali per session)
   const hasRunCleanup = useRef(false);
@@ -284,15 +292,36 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   // Transactions methods
   const loadTransactions = useCallback(
-    async (limit: number = 50, offset: number = 0): Promise<void> => {
+    async (
+      limit: number = 50,
+      offset: number = 0,
+      append: boolean = false
+    ): Promise<void> => {
       try {
         const data = await database.getTransactions(limit, offset);
-        setTransactions(data);
 
-        // 🧪 TESTING: Cleanup transaksi lama (1 MENIT untuk testing)
-        // ⚠️ TODO: Revert to cleanupOldTransactions(3) after testing!
-        // Menggunakan InteractionManager agar tidak block UI
-        if (!hasRunCleanup.current) {
+        if (append) {
+          // ✅ PAGINATION: Append mode untuk infinite scroll
+          setTransactions((prev) => [...prev, ...data]);
+        } else {
+          // Replace mode untuk initial load atau refresh
+          setTransactions(data);
+          transactionOffsetRef.current = 0; // Reset offset
+        }
+
+        // Track if more data available (jika data < limit, berarti sudah habis)
+        setHasMoreTransactions(data.length >= limit);
+
+        if (append) {
+          // Update offset untuk next load
+          transactionOffsetRef.current = offset + data.length;
+        } else {
+          // Initial load offset
+          transactionOffsetRef.current = data.length;
+        }
+
+        // Cleanup transaksi lama (hanya pada initial load)
+        if (!append && !hasRunCleanup.current) {
           hasRunCleanup.current = true;
           InteractionManager.runAfterInteractions(async () => {
             try {
@@ -311,10 +340,23 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         }
       } catch (error) {
         console.error("Error loading transactions:", error);
+        throw error;
       }
     },
     []
   );
+
+  // ✅ PAGINATION: Load more transactions for infinite scroll
+  const loadMoreTransactions = useCallback(async (): Promise<void> => {
+    if (!hasMoreTransactions) return; // No more data to load
+
+    try {
+      await loadTransactions(50, transactionOffsetRef.current, true); // append=true
+    } catch (error) {
+      console.error("Error loading more transactions:", error);
+      throw error;
+    }
+  }, [hasMoreTransactions, loadTransactions]);
 
   const loadMonthlyStats = useCallback(
     async (year: number, month: number): Promise<void> => {
@@ -653,7 +695,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       // Transactions
       transactions,
+      hasMoreTransactions, // ✅ PAGINATION
       loadTransactions,
+      loadMoreTransactions, // ✅ PAGINATION
       addTransaction,
       addGlobalIncome,
       addMultiCategoryIncome,
@@ -707,12 +751,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       getExpenseTypeTotalsByMonth,
       getLoanPayments,
       handleInitializeNotifications,
+      hasMoreTransactions, // ✅ PAGINATION
       initializeApp,
       loadAllData,
       loadCategories,
       loadExpenseTypes,
       loadLoans,
       loadMonthlyStats,
+      loadMoreTransactions, // ✅ PAGINATION
       loadTotalAllTimeBalance,
       loadTransactions,
       loans,

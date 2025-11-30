@@ -547,20 +547,32 @@ export const AddTransactionScreen: React.FC = () => {
     item: { date: string; transactions: Transaction[] };
   }) => (
     <View style={styles.transactionGroup}>
-      <View style={styles.dateHeader}>
-        <MaterialIcons name="calendar-today" size={16} color="#2196F3" />
-        <Text style={styles.dateHeaderText}>{item.date}</Text>
-        <Text style={styles.transactionCountInGroup}>
-          {item.transactions.length} transaksi
-        </Text>
+      {/* Date Header with better visual separation */}
+      <View style={styles.dateHeaderCard}>
+        <View style={styles.dateHeaderContent}>
+          <View style={styles.dateHeaderLeft}>
+            <MaterialIcons name="event" size={20} color="#2196F3" />
+            <Text style={styles.dateHeaderText}>{item.date}</Text>
+          </View>
+          <View style={styles.transactionCountBadge}>
+            <Text style={styles.transactionCountInGroup}>
+              {item.transactions.length}
+            </Text>
+          </View>
+        </View>
       </View>
-      {item.transactions.map((transaction) => (
-        <TransactionItem
-          key={transaction.id!.toString()}
-          transaction={transaction}
-          categories={categories}
-        />
-      ))}
+      {/* Transaction Items */}
+      <View style={styles.transactionItemsContainer}>
+        {item.transactions.map((transaction) => (
+          <TransactionItem
+            key={transaction.id!.toString()}
+            transaction={transaction}
+            categories={categories}
+          />
+        ))}
+      </View>
+      {/* Separator line */}
+      <View style={styles.groupSeparator} />
     </View>
   );
 
@@ -1174,34 +1186,64 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   transactionGroup: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
-  dateHeader: {
+  dateHeaderCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  dateHeaderContent: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8F9FA",
-    marginHorizontal: 16,
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderLeftWidth: 3,
+    borderLeftWidth: 4,
     borderLeftColor: "#2196F3",
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
   },
-  dateHeaderText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333333",
-    marginLeft: 8,
+  dateHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
+  dateHeaderText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1976D2",
+    marginLeft: 10,
+    letterSpacing: 0.3,
+  },
+  transactionCountBadge: {
+    backgroundColor: "#2196F3",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 28,
+    alignItems: "center",
+  },
   transactionCountInGroup: {
-    fontSize: 12,
-    color: "#666666",
-    backgroundColor: "#E3F2FD",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  transactionItemsContainer: {
+    marginBottom: 8,
+  },
+  groupSeparator: {
+    height: 2,
+    backgroundColor: "#E0E0E0",
+    marginHorizontal: 32,
+    marginTop: 12,
+    borderRadius: 1,
   },
   multiSelectContainer: {
     gap: 8,

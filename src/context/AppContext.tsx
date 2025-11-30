@@ -289,22 +289,23 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         const data = await database.getTransactions(limit, offset);
         setTransactions(data);
 
-        // Cleanup transaksi lama (3 bulan) secara aman - hanya sekali per session
+        // 🧪 TESTING: Cleanup transaksi lama (1 MENIT untuk testing)
+        // ⚠️ TODO: Revert to cleanupOldTransactions(3) after testing!
         // Menggunakan InteractionManager agar tidak block UI
         if (!hasRunCleanup.current) {
           hasRunCleanup.current = true;
           InteractionManager.runAfterInteractions(async () => {
             try {
+              // Cleanup transaksi yang lebih dari 3 bulan
               const deletedCount = await database.cleanupOldTransactions(3);
               if (deletedCount > 0) {
                 console.log(
-                  `Cleaned up ${deletedCount} old transactions (>3 months)`
+                  `[CLEANUP] Cleaned up ${deletedCount} old transactions (>3 months)`
                 );
               }
             } catch (error) {
               // Silent failure untuk cleanup - tidak mengganggu user experience
-              // Error hanya di-log untuk debugging
-              console.warn("Cleanup old transactions failed:", error);
+              console.warn("[CLEANUP] Cleanup failed:", error);
             }
           });
         }
@@ -545,11 +546,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     await runWithLoading(async () => {
       await database.resetTransactions();
       await Promise.all([
-        loadCategories(),
-        loadTransactions(),
-        loadExpenseTypes(),
+        loadCategories(), // Reload categories (balance tetap ada)
+        loadTransactions(), // Reload transactions (akan kosong)
+        loadExpenseTypes(), // Reload expense types
       ]);
-      setMonthlyStats(createEmptyStats());
+      // TIDAK reset monthlyStats karena saldo kategori masih ada
+      // User hanya hapus history transaksi, bukan reset total balance
     });
   }, [loadCategories, loadExpenseTypes, loadTransactions, runWithLoading]);
 

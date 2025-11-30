@@ -47,6 +47,15 @@ export interface ExpenseType {
   total_spent: number;
 }
 
+// Interface untuk tabel monthly_aggregates (statistik bulanan persisten)
+export interface MonthlyAggregate {
+  id?: number;
+  year: number;
+  month: number;
+  total_income: number;
+  total_expense: number;
+}
+
 class Database {
   private db: SQLite.SQLiteDatabase | null = null;
   private expenseTypesHasCreatedAtCache: boolean | null = null;
@@ -140,6 +149,19 @@ class Database {
         await this.db.execAsync("ALTER TABLE loans ADD COLUMN note TEXT");
       }
 
+      // Buat tabel monthly_aggregates untuk statistik bulanan yang persisten
+      // Tabel ini TIDAK dihapus saat cleanup transaksi, agar statistik tetap ada
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS monthly_aggregates (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          year INTEGER NOT NULL,
+          month INTEGER NOT NULL,
+          total_income REAL NOT NULL DEFAULT 0,
+          total_expense REAL NOT NULL DEFAULT 0,
+          UNIQUE(year, month)
+        );
+      `);
+
       // Buat tabel loan_payments untuk tracking pembayaran
       await this.db.execAsync(`
         CREATE TABLE IF NOT EXISTS loan_payments (
@@ -169,6 +191,10 @@ class Database {
       await this.insertDefaultCategories();
       await this.insertDefaultExpenseTypes();
       await this.recalculateExpenseTypeTotals();
+
+      // Populate monthly aggregates dari existing transactions (migration)
+      // Harus dipanggil SETELAH tabel monthly_aggregates dibuat
+      await this.populateMonthlyAggregatesFromTransactions();
 
       // Database initialized successfully - ready for production
     } catch (error) {
@@ -266,6 +292,62 @@ class Database {
     }
 
     this.expenseTypesHasCreatedAtCache = true;
+  }
+
+  /**
+   * Migration: Populate monthly_aggregates dari existing transactions.
+   * Dipanggil sekali saat initialization untuk backward compatibility.
+   */
+  private async populateMonthlyAggregatesFromTransactions(): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+
+    try {
+      // Cek apakah aggregate sudah pernah di-populate
+      const existingCount = await this.db.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM monthly_aggregates"
+      );
+
+      // Jika sudah ada data, skip migration
+      if (existingCount && existingCount.count > 0) {
+        return;
+      }
+
+      // Aggregate existing transactions per bulan
+      const aggregates = await this.db.getAllAsync<{
+        year: number;
+        month: number;
+        total_income: number;
+        total_expense: number;
+      }>(`
+        SELECT 
+          CAST(strftime('%Y', date) AS INTEGER) as year,
+          CAST(strftime('%m', date) AS INTEGER) as month,
+          COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as total_income,
+          COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as total_expense
+        FROM transactions
+        GROUP BY year, month
+        ORDER BY year DESC, month DESC
+      `);
+
+      // Insert aggregates ke table
+      if (aggregates.length > 0) {
+        await this.db.withExclusiveTransactionAsync(async (txn) => {
+          for (const agg of aggregates) {
+            await txn.runAsync(
+              `INSERT INTO monthly_aggregates (year, month, total_income, total_expense)
+               VALUES (?, ?, ?, ?)`,
+              [agg.year, agg.month, agg.total_income, agg.total_expense]
+            );
+          }
+        });
+        console.log(
+          `[MIGRATION] Populated ${aggregates.length} monthly aggregates from existing transactions`
+        );
+      }
+    } catch (error) {
+      console.error("Error populating monthly aggregates:", error);
+      // Silent failure - migration tidak critical
+    }
   }
 
   private async expenseTypesHasCreatedAt(): Promise<boolean> {
@@ -579,6 +661,15 @@ class Database {
         }
       });
 
+      // Update aggregate untuk statistik bulanan persisten
+      const txDate = new Date(transaction.date);
+      await this.updateMonthlyAggregate(
+        txDate.getFullYear(),
+        txDate.getMonth() + 1,
+        transaction.type === "income" ? transaction.amount : 0,
+        transaction.type === "expense" ? transaction.amount : 0
+      );
+
       return insertedId;
     } catch (error) {
       console.error("Error adding transaction:", error);
@@ -604,6 +695,7 @@ class Database {
       }
 
       const date = new Date().toISOString();
+      const dateObj = new Date(date);
 
       // Bagi pemasukan ke semua kategori berdasarkan persentase
       await this.db.withExclusiveTransactionAsync(async (txn) => {
@@ -628,6 +720,14 @@ class Database {
           );
         }
       });
+
+      // Update aggregate untuk statistik persisten
+      await this.updateMonthlyAggregate(
+        dateObj.getFullYear(),
+        dateObj.getMonth() + 1,
+        amount, // Total income
+        0 // No expense
+      );
     } catch (error) {
       throw error;
     }
@@ -675,6 +775,7 @@ class Database {
       }
 
       const date = new Date().toISOString();
+      const dateObj = new Date(date);
 
       // Distribusikan pemasukan berdasarkan proporsi persentase kategori yang dipilih
       await this.db.withExclusiveTransactionAsync(async (txn) => {
@@ -701,6 +802,14 @@ class Database {
           );
         }
       });
+
+      // Update aggregate untuk statistik persisten
+      await this.updateMonthlyAggregate(
+        dateObj.getFullYear(),
+        dateObj.getMonth() + 1,
+        amount, // Total income
+        0 // No expense
+      );
     } catch (error) {
       throw error;
     }
@@ -840,6 +949,47 @@ class Database {
   }
 
   // Utility functions untuk statistik
+  /**
+   * Update atau insert aggregate bulanan.
+   * Dipanggil setiap kali ada transaksi baru untuk menjaga konsistensi.
+   */
+  private async updateMonthlyAggregate(
+    year: number,
+    month: number,
+    incomeAmount: number,
+    expenseAmount: number
+  ): Promise<void> {
+    await this.ensureInitialized();
+    if (!this.db) throw new Error("Database not initialized");
+
+    try {
+      // Coba update existing aggregate
+      const result = await this.db.runAsync(
+        `UPDATE monthly_aggregates 
+         SET total_income = total_income + ?, 
+             total_expense = total_expense + ?
+         WHERE year = ? AND month = ?`,
+        [incomeAmount, expenseAmount, year, month]
+      );
+
+      // Jika tidak ada row yang di-update, insert baru
+      if (result.changes === 0) {
+        await this.db.runAsync(
+          `INSERT INTO monthly_aggregates (year, month, total_income, total_expense)
+           VALUES (?, ?, ?, ?)`,
+          [year, month, incomeAmount, expenseAmount]
+        );
+      }
+    } catch (error) {
+      console.error("Error updating monthly aggregate:", error);
+      // Silent failure - aggregate adalah fitur tambahan
+    }
+  }
+
+  /**
+   * Get statistik bulanan dari transactions table.
+   * Jika tidak ada transaksi (karena cleanup), fallback ke aggregate table.
+   */
   async getMonthlyStats(
     year: number,
     month: number
@@ -850,7 +1000,7 @@ class Database {
       const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
       const endDate = `${year}-${month.toString().padStart(2, "0")}-31`;
 
-      // Optimized: Gabung 2 query jadi 1 dengan conditional SUM
+      // Coba ambil dari transactions table dulu
       const result = (await this.db.getFirstAsync(
         `SELECT 
           COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as totalIncome,
@@ -860,9 +1010,33 @@ class Database {
         [startDate, endDate]
       )) as { totalIncome: number; totalExpense: number };
 
+      // Jika ada data transaksi, return
+      if (result.totalIncome > 0 || result.totalExpense > 0) {
+        return {
+          totalIncome: result.totalIncome,
+          totalExpense: result.totalExpense,
+        };
+      }
+
+      // Jika tidak ada transaksi (mungkin karena cleanup), ambil dari aggregate
+      const aggregate = (await this.db.getFirstAsync(
+        `SELECT total_income as totalIncome, total_expense as totalExpense
+         FROM monthly_aggregates
+         WHERE year = ? AND month = ?`,
+        [year, month]
+      )) as { totalIncome: number; totalExpense: number } | null;
+
+      if (aggregate) {
+        return {
+          totalIncome: aggregate.totalIncome,
+          totalExpense: aggregate.totalExpense,
+        };
+      }
+
+      // Fallback jika tidak ada data sama sekali
       return {
-        totalIncome: result.totalIncome,
-        totalExpense: result.totalExpense,
+        totalIncome: 0,
+        totalExpense: 0,
       };
     } catch (error) {
       console.error("Error getting monthly stats:", error);
@@ -961,13 +1135,22 @@ class Database {
     }
   }
 
+  /**
+   * Reset riwayat transaksi SAJA (history record).
+   * TIDAK mengubah saldo kategori - saldo tetap seperti terakhir.
+   * Hanya menghapus record transaksi untuk membersihkan history.
+   */
   async resetTransactions(): Promise<void> {
     await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
+      // Hanya hapus riwayat transaksi, JANGAN reset saldo kategori
       await this.db.execAsync("DELETE FROM transactions");
-      await this.db.execAsync("UPDATE categories SET balance = 0");
+
+      // Recalculate expense type totals (karena transaksi dihapus)
       await this.recalculateExpenseTypeTotals();
+
+      console.log("[RESET] Transaction history cleared (balances preserved)");
     } catch (error) {
       console.error("Error resetting transactions:", error);
       throw error;
@@ -1026,6 +1209,65 @@ class Database {
   }
 
   /**
+   * 🧪 TESTING ONLY: Cleanup transaksi berdasarkan threshold MENIT
+   * Untuk testing mekanisme cleanup dengan threshold yang lebih kecil
+   */
+  async cleanupOldTransactionsByMinutes(
+    thresholdMinutes: number = 1
+  ): Promise<number> {
+    await this.ensureInitialized();
+    if (!this.db) throw new Error("Database not initialized");
+
+    try {
+      // Hitung cutoff date (X menit yang lalu dari sekarang)
+      const cutoffDate = new Date();
+      cutoffDate.setMinutes(cutoffDate.getMinutes() - thresholdMinutes);
+      const cutoffStr = cutoffDate.toISOString();
+
+      console.log(`[CLEANUP TEST] Cutoff time: ${cutoffStr}`);
+
+      // Hitung berapa transaksi yang akan dihapus
+      const countResult = await this.db.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM transactions WHERE date < ?",
+        [cutoffStr]
+      );
+
+      const deletedCount = countResult?.count || 0;
+      console.log(
+        `[CLEANUP TEST] Found ${deletedCount} transactions to delete`
+      );
+
+      if (deletedCount > 0) {
+        console.log(
+          `[CLEANUP TEST] Deleting ${deletedCount} transactions older than ${thresholdMinutes} minutes`
+        );
+
+        // Hapus HANYA record transaksi, JANGAN ubah balance kategori
+        // Balance kategori adalah saldo berjalan yang harus tetap seperti semula
+        await this.db.runAsync("DELETE FROM transactions WHERE date < ?", [
+          cutoffStr,
+        ]);
+
+        // Recalculate expense type totals untuk konsistensi
+        await this.recalculateExpenseTypeTotals();
+
+        console.log(
+          `[CLEANUP TEST] Successfully deleted ${deletedCount} transaction records (balances preserved)`
+        );
+      }
+
+      return deletedCount;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Gagal membersihkan transaksi lama";
+      console.error("[CLEANUP TEST] Error:", errorMessage);
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
    * Membersihkan transaksi lama yang melebihi threshold bulan.
    * Method ini aman dipanggil kapan saja karena:
    * - Tidak mengubah struktur tabel
@@ -1054,13 +1296,22 @@ class Database {
       const deletedCount = countResult?.count || 0;
 
       if (deletedCount > 0) {
-        // Hapus transaksi lama
+        console.log(
+          `[CLEANUP] Deleting ${deletedCount} transactions older than ${thresholdMonths} months (cutoff: ${cutoffStr})`
+        );
+
+        // Hapus HANYA record transaksi, JANGAN ubah balance kategori
+        // Balance kategori adalah saldo berjalan yang harus tetap seperti semula
         await this.db.runAsync("DELETE FROM transactions WHERE date < ?", [
           cutoffStr,
         ]);
 
         // Recalculate expense type totals untuk konsistensi
         await this.recalculateExpenseTypeTotals();
+
+        console.log(
+          `[CLEANUP] Successfully deleted ${deletedCount} old transaction records (balances preserved)`
+        );
       }
 
       return deletedCount;

@@ -190,7 +190,7 @@ export const ResetScreen: React.FC = () => {
                 <View style={styles.optionContent}>
                   <Text style={styles.optionTitle}>Riwayat Transaksi</Text>
                   <Text style={styles.optionSubtitle}>
-                    Hapus semua transaksi pemasukan dan pengeluaran
+                    Hapus riwayat transaksi (saldo kategori tetap ada)
                   </Text>
                 </View>
               </TouchableOpacity>

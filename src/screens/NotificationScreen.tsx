@@ -210,18 +210,52 @@ export const NotificationScreen: React.FC = React.memo(() => {
         return;
       }
 
-      // Kirim test notification
+      // ✅ DEBUG: Cek scheduled notifications sebelum test
+      const hasScheduled = await checkScheduledNotifications();
+      console.log(`[DEBUG] Has scheduled notifications: ${hasScheduled}`);
+
+      // Kirim test notification (immediate)
+      const testTime = new Date(Date.now() + TIMING.TEST_NOTIFICATION_DELAY);
+      const hours = testTime.getHours().toString().padStart(2, "0");
+      const minutes = testTime.getMinutes().toString().padStart(2, "0");
+
       await scheduleNotification({
         ...settings,
-        time: new Date(Date.now() + TIMING.TEST_NOTIFICATION_DELAY)
-          .toTimeString()
-          .slice(0, 5), // 3 detik dari sekarang
+        time: `${hours}:${minutes}`,
       });
 
       showInfo("Notifikasi test akan muncul dalam 3 detik", "Test Notifikasi");
     } catch (error) {
       console.error("Error sending test notification:", error);
       showError("Gagal mengirim test notifikasi");
+    }
+  };
+
+  // ✅ NEW: Debug function untuk melihat semua scheduled notifications
+  const debugScheduledNotifications = async () => {
+    try {
+      const notificationModule = await import("expo-notifications");
+      const scheduled =
+        await notificationModule.getAllScheduledNotificationsAsync();
+
+      console.log("[DEBUG] All scheduled notifications:", scheduled);
+      console.log(`[DEBUG] Total scheduled: ${scheduled.length}`);
+
+      scheduled.forEach((notif, index) => {
+        console.log(`[DEBUG] Notification ${index + 1}:`, {
+          id: notif.identifier,
+          trigger: notif.trigger,
+          content: notif.content,
+        });
+      });
+
+      showInfo(
+        `Ditemukan ${scheduled.length} notifikasi terjadwal. Lihat console untuk detail.`,
+        "Debug Info"
+      );
+    } catch (error) {
+      console.error("Error debugging notifications:", error);
+      showError("Gagal mendebug notifikasi");
     }
   };
 
@@ -375,7 +409,7 @@ export const NotificationScreen: React.FC = React.memo(() => {
           </Card.Content>
         </Card>
 
-        {/* Test Button */}
+        {/* Test & Debug Buttons */}
         {settings.isEnabled && (
           <Card style={styles.testCard} elevation={1}>
             <Card.Content>
@@ -390,6 +424,23 @@ export const NotificationScreen: React.FC = React.memo(() => {
               <Text style={styles.testDescription}>
                 Kirim notifikasi test untuk memastikan pengaturan bekerja
               </Text>
+
+              {/* Debug Button (Development Only) */}
+              {__DEV__ && (
+                <>
+                  <Button
+                    mode="outlined"
+                    onPress={debugScheduledNotifications}
+                    icon="bug"
+                    style={[styles.testButton, { marginTop: 8 }]}
+                  >
+                    Debug Scheduled Notifications
+                  </Button>
+                  <Text style={styles.testDescription}>
+                    Lihat semua notifikasi yang terjadwal (console log)
+                  </Text>
+                </>
+              )}
             </Card.Content>
           </Card>
         )}

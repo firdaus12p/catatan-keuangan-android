@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Localization from "expo-localization";
 import { Platform } from "react-native";
-import { TIME, TIMING } from "./constants";
 
 // Conditional import untuk expo-notifications
 let Notifications: any = null;
@@ -42,6 +41,22 @@ const getNotifications = async () => {
           shouldShowList: true,
         }),
       });
+
+      // ✅ ANDROID ONLY: Setup notification channel untuk daily reminder
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("daily-reminder", {
+          name: "Pengingat Harian",
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#2196F3",
+          sound: "default",
+          enableVibrate: true,
+          showBadge: true,
+          lockscreenVisibility:
+            Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: false,
+        });
+      }
     } catch (error) {
       console.warn("expo-notifications not available in this environment");
       return null;
@@ -175,6 +190,7 @@ const createNotificationDate = (timeString: string): Date => {
 
 /**
  * Jadwalkan notifikasi harian
+ * ✅ FIXED: Gunakan DAILY trigger untuk Android yang reliable
  */
 export const scheduleNotification = async (
   settings: NotificationSettings
@@ -203,41 +219,32 @@ export const scheduleNotification = async (
 
     let notificationId: string;
 
-    // Untuk Android, gunakan waktu relatif yang dijadwalkan ulang setiap hari
-    const now = new Date();
-    let nextTriggerTime = new Date();
-    nextTriggerTime.setHours(hours, minutes, 0, 0);
-
-    // Jika waktu sudah terlewat hari ini, jadwalkan untuk besok
-    if (nextTriggerTime <= now) {
-      nextTriggerTime.setDate(nextTriggerTime.getDate() + 1);
-    }
-
-    const secondsUntilTrigger = Math.floor(
-      (nextTriggerTime.getTime() - now.getTime()) / TIME.SECONDS_IN_MILLISECOND
-    );
-
+    // ✅ FIXED: Gunakan DAILY trigger untuk Android (lebih reliable dari TIME_INTERVAL)
+    // DAILY trigger otomatis repeat setiap hari tanpa perlu reschedule manual
     if (Platform.OS === "android") {
-      // Android menggunakan time-based trigger (dalam detik)
+      // Android menggunakan DAILY trigger dengan repeats: true
       notificationId = await notificationModule.scheduleNotificationAsync({
         content: {
-          title: "⏰ CatatKu",
-          body: "Saatnya beritahu kemenkeu pengeluaranmu hari ini",
+          title: "⏰ Kemenku - Catat Keuangan",
+          body: "Waktunya mencatat pengeluaran hari ini! 💰",
           sound: true,
           priority: notificationModule.AndroidNotificationPriority.HIGH,
+          // Android notification channel config
+          channelId: "daily-reminder",
         },
         trigger: {
-          type: notificationModule.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: secondsUntilTrigger,
-          repeats: false, // Kita akan reschedule manual
+          type: notificationModule.SchedulableTriggerInputTypes.DAILY,
+          hour: hours,
+          minute: minutes,
+          repeats: true, // ✅ CRITICAL FIX: repeats HARUS true untuk daily
         },
       });
     } else {
       // iOS bisa menggunakan calendar trigger
       notificationId = await notificationModule.scheduleNotificationAsync({
         content: {
-          title: "⏰ CatatKu",
-          body: "Saatnya beritahu kemenkeu pengeluaranmu hari ini",
+          title: "⏰ Kemenku - Catat Keuangan",
+          body: "Waktunya mencatat pengeluaran hari ini! 💰",
           sound: true,
         },
         trigger: {
@@ -252,10 +259,17 @@ export const scheduleNotification = async (
     // Simpan ID notifikasi untuk referensi
     await AsyncStorage.setItem(NOTIFICATION_ID_KEY, notificationId);
 
-    // Untuk Android, karena menggunakan non-repeating, setup listener untuk reschedule
-    if (Platform.OS === "android") {
-      setupNotificationListener(settings);
-    }
+    // ✅ LOGGING: Debug info untuk verifikasi notifikasi terjadwal
+    console.log(
+      `[NOTIFICATION] Scheduled daily reminder at ${hours}:${minutes}`
+    );
+    console.log(`[NOTIFICATION] Notification ID: ${notificationId}`);
+    console.log(
+      `[NOTIFICATION] Platform: ${Platform.OS}, Trigger: DAILY, Repeats: true`
+    );
+
+    // ✅ REMOVED: Tidak perlu listener lagi karena trigger DAILY sudah auto-repeat
+    // setupNotificationListener() dihapus karena tidak reliable untuk background
 
     return notificationId;
   } catch (error) {
@@ -280,28 +294,18 @@ export const scheduleNotification = async (
 
 /**
  * Setup listener untuk reschedule notifikasi Android
- * ⚠️ FIXED: Sekarang menyimpan subscription untuk cleanup
+ * ⚠️ DEPRECATED: Tidak diperlukan lagi karena DAILY trigger otomatis repeat
+ * Listener ini hanya bekerja saat app foreground, tidak reliable untuk background
+ *
+ * REMOVED karena:
+ * 1. DAILY trigger sudah auto-repeat tanpa perlu reschedule manual
+ * 2. addNotificationReceivedListener hanya bekerja saat app foreground
+ * 3. Tidak reliable untuk notifikasi daily yang persistent
  */
 const setupNotificationListener = async (settings: NotificationSettings) => {
-  const notificationModule = await getNotifications();
-  if (!notificationModule) return null;
-
-  // Cleanup listener lama jika ada
-  if (notificationListenerSubscription) {
-    notificationListenerSubscription.remove();
-    notificationListenerSubscription = null;
-  }
-
-  // Setup listener baru
-  notificationListenerSubscription =
-    notificationModule.addNotificationReceivedListener(() => {
-      // Reschedule untuk hari berikutnya
-      setTimeout(() => {
-        scheduleNotification(settings);
-      }, TIMING.NOTIFICATION_RESCHEDULE_DELAY);
-    });
-
-  return notificationListenerSubscription;
+  // ✅ DEPRECATED: Function ini tidak dipakai lagi
+  // Dibiarkan untuk backward compatibility, tapi tidak melakukan apa-apa
+  return null;
 };
 
 /**

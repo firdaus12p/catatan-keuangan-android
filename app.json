@@ -34,7 +34,10 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#2196F3",
-          "sounds": []
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "{{unread_count}} notifikasi baru",
+          "defaultChannel": "daily-reminder"
         }
       ],
       [

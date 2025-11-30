@@ -1,7 +1,13 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import React, { useMemo } from "react";
-import { Dimensions, StyleSheet, Text, View } from "react-native";
-import { PieChart } from "react-native-chart-kit";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Dimensions,
+  InteractionManager,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Card } from "react-native-paper";
 import { Category } from "../db/database";
 import { colors } from "../styles/commonStyles";
@@ -9,22 +15,57 @@ import { CHART, CHART_COLORS } from "../utils/constants";
 
 const screenWidth = Dimensions.get("window").width;
 
+// ✅ OPTIMIZATION: Dynamic import untuk PieChart (lazy loading)
+// react-native-chart-kit adalah library berat (~200KB), jadi kita load on-demand
+let PieChartComponent: any = null;
+
 interface ExpenseChartsProps {
   categories: Category[];
 }
 
-// Memoized PieChart wrapper
-const MemoizedPieChart = React.memo(PieChart, (prevProps, nextProps) => {
-  return (
-    prevProps.data.length === nextProps.data.length &&
-    prevProps.data.every(
-      (item, index) => item.population === nextProps.data[index].population
-    )
-  );
-});
+// ✅ OPTIMIZATION: Memoized PieChart wrapper dengan dynamic component
+const MemoizedPieChart = React.memo(
+  ({ PieChart: Chart, ...props }: any) => {
+    if (!Chart) return null;
+    return <Chart {...props} />;
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.data.length === nextProps.data.length &&
+      prevProps.data.every(
+        (item: any, index: number) =>
+          item.population === nextProps.data[index].population
+      )
+    );
+  }
+);
 
 export const ExpenseCharts = React.memo<ExpenseChartsProps>(
   ({ categories }) => {
+    // ✅ OPTIMIZATION: State untuk track loading chart library
+    const [isChartReady, setIsChartReady] = useState(false);
+
+    // ✅ OPTIMIZATION: Dynamic import PieChart setelah UI interactive
+    useEffect(() => {
+      const loadChartLibrary = async () => {
+        // Defer loading sampai UI idle (tidak blocking render)
+        const task = InteractionManager.runAfterInteractions(async () => {
+          try {
+            // Dynamic import react-native-chart-kit
+            const chartKit = await import("react-native-chart-kit");
+            PieChartComponent = chartKit.PieChart;
+            setIsChartReady(true);
+          } catch (error) {
+            console.warn("Failed to load chart library:", error);
+          }
+        });
+
+        return () => task.cancel();
+      };
+
+      loadChartLibrary();
+    }, []);
+
     const chartConfig = {
       backgroundColor: "#FFFFFF",
       backgroundGradientFrom: "#FFFFFF",
@@ -77,8 +118,15 @@ export const ExpenseCharts = React.memo<ExpenseChartsProps>(
         <Card.Content>
           <Text style={styles.sectionTitle}>Distribusi Saldo Kategori</Text>
           <View style={styles.chartContainer}>
-            {categoriesWithBalance.length > 0 ? (
+            {!isChartReady ? (
+              // ✅ OPTIMIZATION: Lightweight loading placeholder
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.home} />
+                <Text style={styles.loadingText}>Memuat grafik...</Text>
+              </View>
+            ) : categoriesWithBalance.length > 0 ? (
               <MemoizedPieChart
+                PieChart={PieChartComponent}
                 data={categoryBalanceData}
                 width={screenWidth - 10}
                 height={CHART.DEFAULT_HEIGHT}
@@ -148,5 +196,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#999999",
     textAlign: "center",
+  },
+  // ✅ OPTIMIZATION: Loading placeholder styles
+  loadingContainer: {
+    height: CHART.DEFAULT_HEIGHT,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.home,
+    fontStyle: "italic",
   },
 });

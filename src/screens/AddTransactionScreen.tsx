@@ -87,6 +87,8 @@ export const AddTransactionScreen: React.FC = () => {
   const [expenseTypeManagerVisible, setExpenseTypeManagerVisible] =
     useState(false);
   const [saving, setSaving] = useState(false);
+  const [showHistory, setShowHistory] = useState(false); // Toggle show/hide history
+  const [historyLimit, setHistoryLimit] = useState(10); // Default 10 transaksi
 
   // Gunakan custom hook untuk validasi alokasi
   const { validateAllocationForTransaction } = useAllocationValidator();
@@ -351,30 +353,44 @@ export const AddTransactionScreen: React.FC = () => {
 
   // Filter transaksi berdasarkan bulan dengan memoization
   const filteredTransactions = useMemo((): Transaction[] => {
-    if (filter === "all") return transactions;
+    let filtered: Transaction[];
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
+    if (filter === "all") {
+      filtered = transactions;
+    } else {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
 
-    return transactions.filter((transaction) => {
-      const transactionDate = new Date(transaction.date);
-      const transactionYear = transactionDate.getFullYear();
-      const transactionMonth = transactionDate.getMonth() + 1;
+      filtered = transactions.filter((transaction) => {
+        const transactionDate = new Date(transaction.date);
+        const transactionYear = transactionDate.getFullYear();
+        const transactionMonth = transactionDate.getMonth() + 1;
 
-      if (filter === "current") {
-        return (
-          transactionYear === currentYear && transactionMonth === currentMonth
-        );
-      } else if (filter === "previous") {
-        const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-        const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-        return transactionYear === prevYear && transactionMonth === prevMonth;
-      }
+        if (filter === "current") {
+          return (
+            transactionYear === currentYear && transactionMonth === currentMonth
+          );
+        } else if (filter === "previous") {
+          const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+          const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+          return transactionYear === prevYear && transactionMonth === prevMonth;
+        }
 
-      return false;
-    });
-  }, [transactions, filter]);
+        return false;
+      });
+    }
+
+    // Jika history disembunyikan, tampilkan hanya N transaksi terbaru
+    if (!showHistory && filtered.length > historyLimit) {
+      // Sort by date desc, ambil N terbaru
+      return [...filtered]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, historyLimit);
+    }
+
+    return filtered;
+  }, [transactions, filter, showHistory, historyLimit]);
 
   // Group transaksi berdasarkan tanggal dengan memoization
   const groupedTransactions = useMemo(() => {
@@ -485,24 +501,43 @@ export const AddTransactionScreen: React.FC = () => {
         </Card.Content>
       </Card>
 
-      {/* Header Riwayat Transaksi */}
-      <View style={styles.historyHeader}>
-        <View style={styles.historyTitleContainer}>
-          <MaterialIcons name="history" size={24} color="#2196F3" />
-          <Text style={styles.historyTitle}>Riwayat Transaksi</Text>
+      {/* Accordion Header Riwayat Transaksi */}
+      <TouchableOpacity
+        style={styles.historyAccordion}
+        onPress={() => setShowHistory(!showHistory)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.accordionHeader}>
+          <View style={styles.historyTitleContainer}>
+            <MaterialIcons name="history" size={24} color="#2196F3" />
+            <View style={styles.historyTitleTextContainer}>
+              <Text style={styles.historyTitle}>Riwayat Transaksi</Text>
+              <Text style={styles.historySubtitle}>
+                {filter === "current" && `${currentMonthName} ${year}`}
+                {filter === "previous" &&
+                  `${previousMonthName} ${month === 1 ? year - 1 : year}`}
+                {filter === "all" && "Semua Periode"}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.accordionRight}>
+            {filteredTransactions.length > 0 && (
+              <View style={styles.transactionBadge}>
+                <Text style={styles.transactionBadgeText}>
+                  {showHistory
+                    ? filteredTransactions.length
+                    : Math.min(historyLimit, filteredTransactions.length)}
+                </Text>
+              </View>
+            )}
+            <MaterialIcons
+              name={showHistory ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+              size={28}
+              color="#2196F3"
+            />
+          </View>
         </View>
-        <Text style={styles.historySubtitle}>
-          {filter === "current" && `${currentMonthName} ${year}`}
-          {filter === "previous" &&
-            `${previousMonthName} ${month === 1 ? year - 1 : year}`}
-          {filter === "all" && "Semua Periode"}
-        </Text>
-        {filteredTransactions.length > 0 && (
-          <Text style={styles.transactionCount}>
-            {filteredTransactions.length} transaksi ditemukan
-          </Text>
-        )}
-      </View>
+      </TouchableOpacity>
     </View>
   );
 
@@ -1077,29 +1112,56 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 8,
   },
-  historyHeader: {
+  historyAccordion: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 16,
     marginBottom: 8,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  accordionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 16,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   historyTitleContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    flex: 1,
+  },
+  historyTitleTextContainer: {
+    marginLeft: 12,
+    flex: 1,
   },
   historyTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: colors.income,
-    marginLeft: 8,
+    marginBottom: 2,
+  },
+  accordionRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  transactionBadge: {
+    backgroundColor: "#2196F3",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 32,
+    alignItems: "center",
+  },
+  transactionBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "bold",
   },
   historySubtitle: {
     fontSize: 14,

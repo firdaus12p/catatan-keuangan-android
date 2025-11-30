@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, InteractionManager, View } from "react-native";
+import { ActivityIndicator, InteractionManager } from "react-native";
 import { Modal, Portal, Text } from "react-native-paper";
 import { ExpenseType } from "../db/database";
 import { colors } from "../styles/commonStyles";

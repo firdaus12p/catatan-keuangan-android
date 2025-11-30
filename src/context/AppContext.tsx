@@ -5,8 +5,10 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { InteractionManager } from "react-native";
 import {
   Category,
   database,
@@ -132,6 +134,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   );
   const [totalAllTimeBalance, setTotalAllTimeBalance] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  // Flag untuk cleanup transaksi lama (hanya sekali per session)
+  const hasRunCleanup = useRef(false);
 
   const runWithLoading = useCallback(
     async (task: () => Promise<void>): Promise<void> => {
@@ -283,6 +288,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       try {
         const data = await database.getTransactions(limit, offset);
         setTransactions(data);
+
+        // Cleanup transaksi lama (3 bulan) secara aman - hanya sekali per session
+        // Menggunakan InteractionManager agar tidak block UI
+        if (!hasRunCleanup.current) {
+          hasRunCleanup.current = true;
+          InteractionManager.runAfterInteractions(async () => {
+            try {
+              const deletedCount = await database.cleanupOldTransactions(3);
+              if (deletedCount > 0) {
+                console.log(
+                  `Cleaned up ${deletedCount} old transactions (>3 months)`
+                );
+              }
+            } catch (error) {
+              // Silent failure untuk cleanup - tidak mengganggu user experience
+              // Error hanya di-log untuk debugging
+              console.warn("Cleanup old transactions failed:", error);
+            }
+          });
+        }
       } catch (error) {
         console.error("Error loading transactions:", error);
       }

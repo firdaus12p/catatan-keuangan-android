@@ -1024,6 +1024,54 @@ class Database {
       throw error;
     }
   }
+
+  /**
+   * Membersihkan transaksi lama yang melebihi threshold bulan.
+   * Method ini aman dipanggil kapan saja karena:
+   * - Tidak mengubah struktur tabel
+   * - Tidak mengubah balance kategori (balance sudah final dari transaksi lama)
+   * - Hanya menghapus record transaksi history untuk hemat storage
+   *
+   * @param thresholdMonths Jumlah bulan untuk menyimpan transaksi (default: 3 bulan)
+   * @returns Promise<number> Jumlah transaksi yang dihapus
+   */
+  async cleanupOldTransactions(thresholdMonths: number = 3): Promise<number> {
+    await this.ensureInitialized();
+    if (!this.db) throw new Error("Database not initialized");
+
+    try {
+      // Hitung cutoff date (3 bulan yang lalu dari sekarang)
+      const cutoffDate = new Date();
+      cutoffDate.setMonth(cutoffDate.getMonth() - thresholdMonths);
+      const cutoffStr = cutoffDate.toISOString().split("T")[0];
+
+      // Hitung berapa transaksi yang akan dihapus
+      const countResult = await this.db.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM transactions WHERE date < ?",
+        [cutoffStr]
+      );
+
+      const deletedCount = countResult?.count || 0;
+
+      if (deletedCount > 0) {
+        // Hapus transaksi lama
+        await this.db.runAsync("DELETE FROM transactions WHERE date < ?", [
+          cutoffStr,
+        ]);
+
+        // Recalculate expense type totals untuk konsistensi
+        await this.recalculateExpenseTypeTotals();
+      }
+
+      return deletedCount;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Gagal membersihkan transaksi lama";
+      throw new Error(errorMessage);
+    }
+  }
 }
 
 // Export singleton instance

@@ -24,7 +24,7 @@ import {
   TextInput,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
+import { LazyExpenseTypeManagerModal } from "../components/LazyExpenseTypeManagerModal";
 import { TransactionItem } from "../components/TransactionItem";
 import { useApp } from "../context/AppContext";
 import { Transaction } from "../db/database";
@@ -923,7 +923,7 @@ export const AddTransactionScreen: React.FC = () => {
         </Modal>
       </Portal>
 
-      <ExpenseTypeManagerModal
+      <LazyExpenseTypeManagerModal
         visible={expenseTypeManagerVisible}
         onDismiss={closeExpenseTypeManager}
         expenseTypes={expenseTypes}

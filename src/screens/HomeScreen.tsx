@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CategoryBalanceCard } from "../components/CategoryBalanceCard";
 import { ExpenseCharts } from "../components/ExpenseCharts";
 import { ExpenseTypeHighlight } from "../components/ExpenseTypeHighlight";
-import { ExpenseTypeManagerModal } from "../components/ExpenseTypeManagerModal";
+import { LazyExpenseTypeManagerModal } from "../components/LazyExpenseTypeManagerModal";
 import { FinancialSummary } from "../components/FinancialSummary";
 import { useApp } from "../context/AppContext";
 import { ExpenseType } from "../db/database";
@@ -420,7 +420,7 @@ export const HomeScreen: React.FC = () => {
         />
       </ScrollView>
 
-      <ExpenseTypeManagerModal
+      <LazyExpenseTypeManagerModal
         visible={expenseTypeManagerVisible}
         onDismiss={closeExpenseTypeManager}
         expenseTypes={expenseTypes}

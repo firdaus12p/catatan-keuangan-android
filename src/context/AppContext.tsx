@@ -143,7 +143,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [totalAllTimeBalance, setTotalAllTimeBalance] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Flag untuk cleanup transaksi lama (hanya sekali per session)
+  // ✅ PERFORMANCE OPTIMIZATION: Flag untuk cleanup transaksi lama
+  // Cleanup hanya dijalankan sekali per session untuk menghindari overhead berulang
+  // Lihat cleanupOldTransactions() di loadTransactions()
   const hasRunCleanup = useRef(false);
 
   const runWithLoading = useCallback(
@@ -291,6 +293,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   );
 
   // Transactions methods
+  // ✅ PERFORMANCE OPTIMIZATION: Pagination dengan append mode
+  // - limit: Jumlah data per batch (default 50)
+  // - offset: Starting point untuk query (tracked via transactionOffsetRef)
+  // - append: true = concat data, false = replace data (untuk refresh)
+  // Lihat handleLoadMore() di AddTransactionScreen.tsx untuk infinite scroll
   const loadTransactions = useCallback(
     async (
       limit: number = 50,
@@ -320,7 +327,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           transactionOffsetRef.current = data.length;
         }
 
-        // Cleanup transaksi lama (hanya pada initial load)
+        // ✅ PERFORMANCE OPTIMIZATION: Cleanup transaksi lama (hanya initial load)
+        // Menghapus record transaksi >3 bulan untuk mengurangi beban database
+        // CATATAN: Balance kategori TIDAK terpengaruh (tetap akurat)
+        // Menggunakan InteractionManager agar tidak blocking UI
         if (!append && !hasRunCleanup.current) {
           hasRunCleanup.current = true;
           InteractionManager.runAfterInteractions(async () => {

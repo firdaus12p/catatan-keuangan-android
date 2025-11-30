@@ -15,8 +15,10 @@ import { CHART, CHART_COLORS } from "../utils/constants";
 
 const screenWidth = Dimensions.get("window").width;
 
-// ✅ OPTIMIZATION: Dynamic import untuk PieChart (lazy loading)
+// ✅ PERFORMANCE OPTIMIZATION: Dynamic import untuk PieChart (lazy loading)
 // react-native-chart-kit adalah library berat (~200KB), jadi kita load on-demand
+// Module-level cache memastikan import hanya terjadi sekali per app session
+// Menggunakan InteractionManager agar tidak blocking initial render HomeScreen
 let PieChartComponent: any = null;
 
 interface ExpenseChartsProps {

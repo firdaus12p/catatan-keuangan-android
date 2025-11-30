@@ -1282,6 +1282,10 @@ class Database {
    * @param thresholdMonths Jumlah bulan untuk menyimpan transaksi (default: 3 bulan)
    * @returns Promise<number> Jumlah transaksi yang dihapus
    */
+  // ✅ PERFORMANCE OPTIMIZATION: Cleanup transaksi lama untuk mengurangi beban database
+  // CRITICAL: Fungsi ini HANYA menghapus record transaksi, TIDAK mengubah balance kategori
+  // Balance kategori adalah "saldo berjalan" yang harus tetap akurat sepanjang waktu
+  // Dipanggil otomatis di AppContext.loadTransactions() sekali per session
   async cleanupOldTransactions(thresholdMonths: number = 3): Promise<number> {
     await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");

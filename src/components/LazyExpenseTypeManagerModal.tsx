@@ -13,8 +13,11 @@ interface LazyExpenseTypeManagerModalProps {
   onDelete: (id: number) => Promise<void>;
 }
 
-// ✅ OPTIMIZATION: Lazy load ExpenseTypeManagerModal (~50KB)
-// Modal hanya di-load saat user membuka modal pertama kali
+// ✅ PERFORMANCE OPTIMIZATION: Lazy load ExpenseTypeManagerModal (~50KB)
+// Modal hanya di-load saat user membuka modal pertama kali (visible=true)
+// Module-level cache memastikan import hanya terjadi sekali
+// Menggunakan InteractionManager agar tidak blocking UI saat modal muncul
+// Menghemat ~100KB dari initial bundle (2 screens x 50KB)
 let ExpenseTypeManagerModalComponent: any = null;
 
 export const LazyExpenseTypeManagerModal: React.FC<

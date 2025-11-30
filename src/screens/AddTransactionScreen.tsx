@@ -96,7 +96,11 @@ export const AddTransactionScreen: React.FC = () => {
   // Gunakan custom hook untuk validasi alokasi
   const { validateAllocationForTransaction } = useAllocationValidator();
 
-  // ✅ PAGINATION: Handle load more for infinite scroll
+  // ✅ PERFORMANCE OPTIMIZATION: Infinite scroll pagination
+  // Guard conditions:
+  // 1. isLoadingMore: Cegah multiple simultaneous requests
+  // 2. hasMoreTransactions: Stop jika sudah habis data
+  // 3. filter !== "all": Infinite scroll OFF saat filter aktif (data di-filter client-side)
   const handleLoadMore = useCallback(async () => {
     // Jangan load jika sedang loading, tidak ada data lagi, atau filter aktif
     // NOTE: Infinite scroll hanya aktif saat filter="all" karena filtering dilakukan client-side

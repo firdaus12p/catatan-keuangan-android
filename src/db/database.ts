@@ -1127,6 +1127,7 @@ class Database {
       await this.db.execAsync("DELETE FROM transactions");
       await this.db.execAsync("DELETE FROM loan_payments");
       await this.db.execAsync("DELETE FROM loans");
+      await this.db.execAsync("DELETE FROM monthly_aggregates");
       await this.db.execAsync("UPDATE categories SET balance = 0");
       await this.recalculateExpenseTypeTotals();
     } catch (error) {
@@ -1136,21 +1137,25 @@ class Database {
   }
 
   /**
-   * Reset riwayat transaksi SAJA (history record).
-   * TIDAK mengubah saldo kategori - saldo tetap seperti terakhir.
-   * Hanya menghapus record transaksi untuk membersihkan history.
+   * Reset transaksi - hapus semua record transaksi, aggregate, dan reset balance kategori ke 0.
+   * Digunakan untuk tombol "Reset Transaksi" di ResetScreen.
+   * Berbeda dengan cleanup otomatis yang hanya hapus history lama.
    */
   async resetTransactions(): Promise<void> {
     await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
-      // Hanya hapus riwayat transaksi, JANGAN reset saldo kategori
+      // Hapus semua transaksi dan aggregate
       await this.db.execAsync("DELETE FROM transactions");
+      await this.db.execAsync("DELETE FROM monthly_aggregates");
+
+      // Reset balance kategori ke 0
+      await this.db.execAsync("UPDATE categories SET balance = 0");
 
       // Recalculate expense type totals (karena transaksi dihapus)
       await this.recalculateExpenseTypeTotals();
 
-      console.log("[RESET] Transaction history cleared (balances preserved)");
+      console.log("[RESET] All transactions, aggregates, and balances cleared");
     } catch (error) {
       console.error("Error resetting transactions:", error);
       throw error;

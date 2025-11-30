@@ -546,12 +546,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     await runWithLoading(async () => {
       await database.resetTransactions();
       await Promise.all([
-        loadCategories(), // Reload categories (balance tetap ada)
+        loadCategories(), // Reload categories (balance direset ke 0)
         loadTransactions(), // Reload transactions (akan kosong)
         loadExpenseTypes(), // Reload expense types
       ]);
-      // TIDAK reset monthlyStats karena saldo kategori masih ada
-      // User hanya hapus history transaksi, bukan reset total balance
+      // Reset monthlyStats karena semua data transaksi dan aggregate dihapus
+      setMonthlyStats(createEmptyStats());
     });
   }, [loadCategories, loadExpenseTypes, loadTransactions, runWithLoading]);
 

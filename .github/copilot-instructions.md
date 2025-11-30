@@ -329,6 +329,7 @@ npx mcp-serena get-symbols-overview # File structure overview
 
 **IMPORTANT**: Project menggunakan **MCP Serena** untuk code analysis dan navigation:
 
+**Gunakan MCP Serena** : Selalu gunakan **MCP Serena** untuk mencari simbol, pola, dan memahami struktur file sebelum membuat perubahan.
 ```typescript
 // Serena commands yang sering digunakan:
 // 1. Cari masalah performa

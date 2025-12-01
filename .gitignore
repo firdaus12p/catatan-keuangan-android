@@ -42,3 +42,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+# MCP Serena project management (local only)
+.serena/

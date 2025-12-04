@@ -1,7 +1,13 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
@@ -381,7 +387,12 @@ export const CategoryScreen: React.FC = () => {
                 value={transferTargetId}
               >
                 {availableTransferTargets.map((target) => (
-                  <View key={target.id} style={styles.transferTargetItem}>
+                  <TouchableOpacity
+                    key={target.id}
+                    style={styles.transferTargetItem}
+                    onPress={() => setTransferTargetId(target.id!.toString())}
+                    activeOpacity={0.7}
+                  >
                     <RadioButton value={target.id!.toString()} />
                     <View style={styles.transferTargetInfo}>
                       <Text style={styles.transferTargetName}>
@@ -391,7 +402,7 @@ export const CategoryScreen: React.FC = () => {
                         Saldo: {formatCurrency(target.balance)}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </RadioButton.Group>
             ) : (

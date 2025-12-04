@@ -11,6 +11,7 @@
 - **Database Singleton**: Class `Database` di `database.ts` dengan auto-migration dan connection pooling
 - **File-based Routing**: Expo Router v6 dengan struktur `app/(tabs)/` untuk tab navigation
 - **Custom Hooks Pattern**: Business logic extracted ke reusable hooks (e.g., `useAllocationValidator`)
+- **Performance Optimizations**: Pagination (50 items), lazy loading, React.memo, InteractionManager
 
 ## 🗂️ Struktur Codebase
 
@@ -212,39 +213,34 @@ const addTransaction = async (transaction: Omit<Transaction, "id">) => {
 - **Status flow**: `unpaid` → `half` (partial payment) → `paid` (fully paid)
 - **Display pattern**: Shows note with 📝 emoji when available
 
-### 🔔 Masalah Notifikasi (Known Issue)
+### 🔔 Notification System (FIXED - 30 Nov 2025)
 
-**CRITICAL**: Notifikasi tidak berfungsi dengan baik karena:
+**Status**: ✅ **WORKING** - Daily notifications menggunakan DAILY trigger
 
 ```typescript
-// ⚠️ ISSUE: expo-notifications tidak kompatibel dengan Expo Go
-const isNotificationSupported = () => {
-  const isExpoGo = __DEV__ && global.expo?.modules?.ExpoGo;
-  return !isExpoGo && !Platform.OS === "web";
-};
+// ✅ PATTERN: DAILY trigger dengan repeats:true untuk auto-repeat
+trigger: {
+  type: SchedulableTriggerInputTypes.DAILY,
+  hour: hours,
+  minute: minutes,
+  repeats: true, // Otomatis repeat setiap hari
+}
 
-// Conditional import yang menyebabkan masalah
-let Notifications: any = null;
-const getNotifications = async () => {
-  if (!Notifications && isNotificationSupported()) {
-    Notifications = await import("expo-notifications");
-  }
-  return Notifications;
-};
+// Android: Setup notification channel untuk better control
+await Notifications.setNotificationChannelAsync("daily-reminder", {
+  name: "Pengingat Harian",
+  importance: Notifications.AndroidImportance.HIGH,
+  vibrationPattern: [0, 250, 250, 250],
+  lightColor: "#2196F3",
+});
 ```
 
-**Root Cause**:
+**Critical Details**:
 
-1. Dynamic import `expo-notifications` kadang gagal di development build
-2. Permission handling tidak konsisten across devices
-3. Timezone handling complex untuk scheduling
-4. Cleanup listener tidak dipanggil properly
-
-**Solusi**:
-
-- Gunakan **production build** untuk testing notifikasi
-- Verifikasi permissions di device settings manually
-- Check `notificationHelper.ts` line 363 `initializeNotifications()`
+- **NO listener required**: DAILY trigger auto-repeats, works in background/closed app
+- **Testing**: Must use **development/production build** (NOT Expo Go - no native module support)
+- **Debug tools**: NotificationScreen has debug button (DEV only) to inspect scheduled notifications
+- See `NOTIFICATION_FIX.md` for complete technical documentation
 
 ## ⚙️ Development Patterns & Conventions
 
@@ -313,56 +309,70 @@ npm run prebuild                 # Generate native folders
 npm run android:build            # Build development APK
 npm run android:release          # Build release APK
 
-# Android build requirements
+# Android build requirements (CRITICAL for Gradle)
 # - JDK configured in android/gradle.properties:
 #   org.gradle.java.home=C:\\Program Files\\Android\\Android Studio\\jbr
-# - SDK path in android/local.properties:
-#   sdk.dir=C:/Users/username/AppData/Local/Android/Sdk
+#   (MUST be JDK, NOT JRE - needs JAVA_COMPILER capability)
+# - SDK path in android/local.properties (NOT committed to git):
+#   sdk.dir=C:\\Users\\username\\AppData\\Local\\Android\\Sdk
 
-# MCP Serena Integration (Code Analysis)
-npx mcp-serena analyze              # Deep codebase analysis
-npx mcp-serena find-symbol          # Search for functions/classes
-npx mcp-serena get-symbols-overview # File structure overview
+# Android Gradle Build (after fixing JDK/SDK paths)
+cd android
+.\gradlew.bat clean                  # Clean build artifacts
+.\gradlew.bat assembleRelease        # Build production APK (~5-10 min)
+# APK output: android/app/build/outputs/apk/release/app-release.apk
 ```
 
-### 🤖 MCP Serena Development Tool
+### 🤖 MCP Serena Development Tool (AI Code Analysis)
 
-**IMPORTANT**: Project menggunakan **MCP Serena** untuk code analysis dan navigation:
+**IMPORTANT**: Project uses **MCP Serena** for intelligent code navigation and analysis.
 
-**Gunakan MCP Serena** : Selalu gunakan **MCP Serena** untuk mencari simbol, pola, dan memahami struktur file sebelum membuat perubahan.
+**When to use Serena tools**:
+
+- **BEFORE** making changes: Understand code structure and relationships
+- **Finding patterns**: Search for specific code patterns across codebase
+- **Symbol analysis**: Locate function/class definitions and usages
+- **Avoiding full file reads**: Get targeted information without reading entire files
+
+**Key Serena Commands**:
+
 ```typescript
-// Serena commands yang sering digunakan:
-// 1. Cari masalah performa
-mcp_oraios_serena_search_for_pattern({
-  substring_pattern: "useState.*[\\s\\S]*?}, \\[\\]",
-  restrict_search_to_code_files: true,
-});
-
-// 2. Analisis symbol relationships
-mcp_oraios_serena_find_referencing_symbols({
-  symbolName: "addGlobalIncome",
-});
-
-// 3. Overview file structure
+// 1. Get file structure overview (FIRST STEP for new files)
 mcp_oraios_serena_get_symbols_overview({
   relative_path: "src/context/AppContext.tsx",
+  max_answer_chars: -1, // Use default, don't adjust unless necessary
+});
+
+// 2. Find specific symbols (functions/classes/methods)
+mcp_oraios_serena_find_symbol({
+  name_path_pattern: "addGlobalIncome", // Function name
+  relative_path: "src/context/AppContext.tsx",
+  include_body: true, // Get full implementation
+  depth: 1, // Include immediate children (methods)
+});
+
+// 3. Search for code patterns (regex-based)
+mcp_oraios_serena_search_for_pattern({
+  substring_pattern: "useState.*[\\s\\S]*?}, \\[\\]", // Empty deps array
+  restrict_search_to_code_files: true,
+  paths_include_glob: "src/**/*.tsx", // Only search specific paths
+});
+
+// 4. Find all references to a symbol
+mcp_oraios_serena_find_referencing_symbols({
+  symbolName: "addTransaction",
+  // Returns code snippets + symbolic info for each reference
 });
 ```
 
-**Serena Workflow**:
+**Serena Best Practices**:
 
-1. **Activate project**: `mcp_oraios_serena_activate_project`
-2. **Read memories**: Context about previous optimizations
-3. **Symbol search**: Find functions/classes across codebase
-4. **Pattern search**: Regex-based code analysis
-5. **Think tools**: Validate task adherence and completion
-
-**Key Serena Patterns**:
-
-- Use `find_symbol` untuk targeted code reads (avoid full file reads)
-- Use `search_for_pattern` untuk validation/refactoring patterns
-- Use `get_symbols_overview` untuk understanding new files
-- Always call `think_about_task_adherence` before major code changes
+- ✅ Start with `get_symbols_overview` for new files (token-efficient)
+- ✅ Use `find_symbol` with `include_body: false` first, then read specific symbols
+- ✅ Call `think_about_task_adherence` before major code changes
+- ✅ Use `search_for_pattern` for validation/refactoring patterns
+- ❌ Don't read full files if symbol tools can give you the info
+- ❌ Don't re-read same content with different tools (wasteful)
 
 ````
 
@@ -416,18 +426,24 @@ try {
 **Database**: expo-sqlite 16 (native, requires dev build)  
 **Storage**: @react-native-async-storage/async-storage 2.2.0  
 **UI**: react-native-paper, @expo/vector-icons  
-**Charts**: react-native-chart-kit (lazy loaded, category distribution only)
+**Charts**: react-native-chart-kit (lazy loaded, category distribution only)  
+**Notifications**: expo-notifications 0.32.13 (DAILY trigger, production build only)
 
 **Key Files untuk Reference**:
 
-- `src/db/database.ts`: Core business logic, validation, all CRUD operations
-- `src/context/AppContext.tsx`: Optimized split state/functions pattern
+- `src/db/database.ts` (1339 lines): Core business logic, validation, all CRUD operations
+- `src/context/AppContext.tsx` (809 lines): Optimized split state/functions pattern
 - `src/hooks/useAllocationValidator.ts`: Example of custom hook pattern (DRY)
 - `src/utils/formatCurrency.ts`: Currency formatting without decimals
+- `src/utils/notificationHelper.ts`: Notification scheduling with DAILY trigger
 - `src/components/ExpenseCharts.tsx`: Single PieChart component (BarChart removed)
+- `src/components/ExpenseTypeHighlight.tsx`: Expense type breakdown with React.memo
+- `app/(tabs)/_layout.tsx`: Tab navigation with FloatingActionButtons
 - `BUILD.md`: Complete build & troubleshooting guide
-- `android/gradle.properties`: JDK configuration for builds
-- `android/local.properties`: Android SDK path configuration
+- `NOTIFICATION_FIX.md`: Notification system fix documentation (30 Nov 2025)
+- `PERFORMANCE_OPTIMIZATION_REVIEW.md`: Performance optimizations review
+- `android/gradle.properties`: JDK configuration (MUST be JDK, not JRE)
+- `android/local.properties`: Android SDK path (NOT committed, local only)
 
 ## 🎯 Project Rules (Non-Negotiable)
 
@@ -447,159 +463,6 @@ try {
 14. **Complete useEffect deps**: All dependencies included, callbacks wrapped with useCallback
 15. **Auto-migration**: Schema changes backward compatible, validation added retroactively
 
-## ⚙️ Development Patterns & Conventions
-
-### 🔧 TypeScript & Code Standards
-
-- **Strict mode**: `tsconfig.json` dengan strict checks enabled
-- **Interface naming**: PascalCase, export dari `database.ts` (Category, Transaction, Loan)
-- **File naming**:
-  - Screens: `HomeScreen.tsx` (PascalCase)
-  - Components: `CategoryCard.tsx` (PascalCase)
-  - Utils: `formatCurrency.ts` (camelCase)
-- **Comments**: Business logic dalam Bahasa Indonesia, technical comments dalam English
-
-### 🎨 UI/UX Patterns
-
-```typescript
-// ✅ SELALU gunakan colors dari commonStyles.ts
-import { colors } from "../styles/commonStyles";
-
-const styles = StyleSheet.create({
-  income: { color: colors.income },     // #4CAF50 (green)
-  expense: { color: colors.expense },   // #F44336 (red)
-  primary: { color: colors.primary },   // #2196F3 (blue)
-});
-
-// ✅ Icons: MaterialIcons dengan semantic names
-<MaterialIcons name="trending-up" size={24} color={colors.income} />
-<MaterialIcons name="trending-down" size={24} color={colors.expense} />
-
-// ✅ Format currency: SELALU gunakan formatCurrency()
-import { formatCurrency } from "../utils/formatCurrency";
-const formatted = formatCurrency(150000); // "Rp150.000"
-```
-
-### 🏗️ Component Patterns
-
-```typescript
-// ✅ PATTERN: React.memo untuk heavy components
-export const FloatingActionButtons: React.FC = React.memo(() => {
-  // Global FAB component with optimization
-});
-
-// ✅ PATTERN: InteractionManager untuk defer non-critical work
-useFocusEffect(
-  React.useCallback(() => {
-    let isMounted = true;
-    const task = InteractionManager.runAfterInteractions(() => {
-      if (!isMounted) return;
-      loadCategories();
-    });
-
-    return () => {
-      isMounted = false;
-      if (task && typeof task.cancel === "function") {
-        task.cancel();
-      }
-    };
-  }, [loadCategories])
-);
-
-// ✅ PATTERN: useTransition untuk smooth navigation
-const [isNavigating, startTransition] = useTransition();
-const navigate = useCallback(
-  (target: TargetRoute) => {
-    startTransition(() => {
-      router.push(target);
-    });
-  },
-  [router]
-);
-```
-
-### 🎣 Custom Hooks Pattern
-
-```typescript
-// ✅ PATTERN: Extract duplicate logic ke reusable hooks
-// src/hooks/useAllocationValidator.ts
-export const useAllocationValidator = () => {
-  const router = useRouter();
-  const { categories } = useApp();
-
-  const validateAllocationForNavigation = useCallback((): boolean => {
-    // Validation logic shared across 3+ components
-  }, [hasCategories, totalAllocationPercentage]);
-
-  return { validateAllocationForNavigation, validateAllocationForTransaction };
-};
-
-// Usage di FloatingActionButtons, HomeScreen, AddTransactionScreen
-const { validateAllocationForNavigation } = useAllocationValidator();
-```
-
-### 🛠️ Build & Development Commands
-
-```bash
-# Development
-npm install                      # Install dependencies
-npx expo start                   # Start dev server
-npx expo start --clear           # Clear cache & start
-npm run type-check               # TypeScript validation
-npm run lint                     # ESLint check
-
-# Building (IMPORTANT: Expo Go tidak support expo-sqlite)
-npm run prebuild                 # Generate native folders
-npm run android:build            # Build development APK
-npm run android:release          # Build release APK
-
-# Troubleshooting
-npx expo install --fix           # Fix package versions
-npx expo prebuild --clean        # Clean rebuild native code
-```
-
-## 🗄️ Database Operations (Critical Patterns)
-
-### Migration & Schema Updates
-
-```typescript
-// ✅ PATTERN: Auto-migration dengan backward compatibility
-class Database {
-  async ensureInitialized() {
-    await this.db.execAsync(`CREATE TABLE IF NOT EXISTS categories...`);
-    await this.addColumnIfNotExists(
-      "transactions",
-      "expense_type_id",
-      "INTEGER"
-    );
-  }
-
-  private async tableHasColumn(table: string, column: string) {
-    const columns = await this.db.getAllAsync(`PRAGMA table_info(${table})`);
-    return columns.some((col) => col.name === column);
-  }
-}
-
-// ❌ NEVER: Direct schema alteration tanpa migration check
-```
-
-### Data Loading Patterns
-
-```typescript
-// ✅ ALWAYS: useFocusEffect untuk screen data loading
-import { useFocusEffect } from "@react-navigation/native";
-
-useFocusEffect(
-  React.useCallback(() => {
-    // Data loads setiap kali screen focused
-    loadCategories();
-    loadTransactions();
-  }, [loadCategories, loadTransactions])
-);
-
-// ❌ NEVER: useEffect untuk screen data (tidak auto-refresh saat navigate back)
-```
-
 ## 🚨 Critical Gotchas & Anti-Patterns
 
 ### ⚠️ Database & Native Modules
@@ -609,6 +472,32 @@ useFocusEffect(
 # Expo Go tidak support custom native modules
 # ✅ SOLUTION: Build development client
 npm run android:build  # Atau npx expo run:android
+```
+
+### ⚠️ Gradle Build Issues
+
+```bash
+# ❌ GOTCHA #1: gradlew clean works but assembleRelease fails
+# ERROR: "Toolchain installation does not provide the required capabilities: [JAVA_COMPILER]"
+# CAUSE: JAVA_HOME or gradle.properties points to JRE instead of JDK
+
+# ✅ SOLUTION: Configure JDK in android/gradle.properties
+# Add this line (Android Studio bundled JDK has compiler):
+org.gradle.java.home=C:\\Program Files\\Android\\Android Studio\\jbr
+
+# ❌ GOTCHA #2: "SDK location not found"
+# CAUSE: android/local.properties missing or ANDROID_HOME not set
+
+# ✅ SOLUTION: Create android/local.properties (NOT committed to git)
+# Add this line:
+sdk.dir=C:\\Users\\username\\AppData\\Local\\Android\\Sdk
+
+# ❌ GOTCHA #3: Missing codegen directories for native modules
+# ERROR: "add_subdirectory given source ... which is not an existing directory"
+# CAUSE: expo prebuild not run or outdated
+
+# ✅ SOLUTION: Clean prebuild
+npx expo prebuild --clean  # Regenerates android folder with proper codegen
 ```
 
 ### ⚠️ State Management Mistakes
@@ -687,34 +576,3 @@ useEffect(() => {
   if (action) openModal();
 }, [action, router, openModal]);
 ```
-
-## 📚 Tech Stack & Key Files
-
-**Core**: Expo SDK 54, React 19, TypeScript 5.9, React Native 0.81  
-**Navigation**: expo-router 6 (file-based), react-navigation  
-**Database**: expo-sqlite 16 (native, requires dev build)  
-**UI**: react-native-paper, @expo/vector-icons  
-**Charts**: react-native-chart-kit (lazy loaded)
-
-**Key Files untuk Reference**:
-
-- `src/db/database.ts` (1003 lines): Core business logic, all CRUD operations
-- `src/context/AppContext.tsx` (728 lines): Optimized split state/functions pattern
-- `src/hooks/useAllocationValidator.ts`: Example of custom hook pattern (DRY)
-- `src/utils/allocation.ts`: Business constants (ALLOCATION_TARGET = 100)
-- `BUILD.md`: Complete build & troubleshooting guide (requires dev build, not Expo Go)
-
-## 🎯 Project Rules (Non-Negotiable)
-
-1. **100% Offline**: Zero network calls
-2. **Android-first**: iOS secondary (iOS untested)
-3. **Bahasa Indonesia**: UI text, error messages, business comments
-4. **useFocusEffect mandatory**: For ALL screen data loading (not useEffect)
-5. **Complete useEffect deps**: Always include all dependencies, wrap callbacks with useCallback
-6. **Custom hooks for shared logic**: Extract duplicate validation/logic to hooks (DRY principle)
-7. **Single prefetch source**: Only FloatingActionButtons prefetches routes (global component)
-8. **React.memo**: For heavy components (FloatingActionButtons, charts)
-9. **InteractionManager**: Defer non-critical work in useFocusEffect
-10. **Strict validation**: Category % ≤100%, expense ≤ balance
-11. **Auto-migration**: Schema changes must be backward compatible
-12. **No temp files**: Avoid `test.js`, `debug.js` in git

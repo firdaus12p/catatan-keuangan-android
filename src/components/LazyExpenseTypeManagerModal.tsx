@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, InteractionManager } from "react-native";
+import { ActivityIndicator } from "react-native";
 import { Modal, Portal, Text } from "react-native-paper";
 import { ExpenseType } from "../db/database";
 import { colors } from "../styles/commonStyles";
@@ -16,7 +16,7 @@ interface LazyExpenseTypeManagerModalProps {
 // ✅ PERFORMANCE OPTIMIZATION: Lazy load ExpenseTypeManagerModal (~50KB)
 // Modal hanya di-load saat user membuka modal pertama kali (visible=true)
 // Module-level cache memastikan import hanya terjadi sekali
-// Menggunakan InteractionManager agar tidak blocking UI saat modal muncul
+// Direct async import untuk menghindari stuck loading state
 // Menghemat ~100KB dari initial bundle (2 screens x 50KB)
 let ExpenseTypeManagerModalComponent: any = null;
 
@@ -31,21 +31,20 @@ export const LazyExpenseTypeManagerModal: React.FC<
     if (visible && !ExpenseTypeManagerModalComponent && !isLoadingModal) {
       setIsLoadingModal(true);
 
-      // Defer loading sampai UI idle
-      const task = InteractionManager.runAfterInteractions(async () => {
+      // Load immediately without InteractionManager to avoid stuck loading
+      (async () => {
         try {
           // Dynamic import modal component
           const module = await import("./ExpenseTypeManagerModal");
           ExpenseTypeManagerModalComponent = module.ExpenseTypeManagerModal;
           setIsComponentReady(true);
-        } catch (error) {
-          console.warn("Failed to load ExpenseTypeManagerModal:", error);
-        } finally {
           setIsLoadingModal(false);
+        } catch (error) {
+          console.error("Failed to load ExpenseTypeManagerModal:", error);
+          setIsLoadingModal(false);
+          setIsComponentReady(false);
         }
-      });
-
-      return () => task.cancel();
+      })();
     }
 
     // Jika component sudah pernah di-load, set ready immediately

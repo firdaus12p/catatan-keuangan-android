@@ -58,7 +58,6 @@ export const ExpenseCharts = React.memo<ExpenseChartsProps>(
             PieChartComponent = chartKit.PieChart;
             setIsChartReady(true);
           } catch (error) {
-            console.warn("Failed to load chart library:", error);
           }
         });
 

@@ -111,7 +111,6 @@ export const AddTransactionScreen: React.FC = () => {
     try {
       await loadMoreTransactions();
     } catch (error) {
-      console.error("Error loading more transactions:", error);
       showError("Gagal memuat transaksi tambahan");
     } finally {
       setIsLoadingMore(false);
@@ -409,16 +408,26 @@ export const AddTransactionScreen: React.FC = () => {
     // Jika history disembunyikan, tampilkan hanya N transaksi terbaru
     if (!showHistory && filtered.length > historyLimit) {
       // Sort by date desc, ambil N terbaru
-      return [...filtered]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, historyLimit);
+      // ✅ OPTIMIZED: Cache timestamps to avoid repeated Date creation
+      // ✅ OPTIMIZED: Use .slice() once for both copy and limit
+      const sorted = filtered.slice().sort((a, b) => {
+        const timeB = new Date(b.date).getTime();
+        const timeA = new Date(a.date).getTime();
+        return timeB - timeA;
+      });
+      return sorted.slice(0, historyLimit);
     }
 
     return filtered;
   }, [transactions, filter, showHistory, historyLimit]);
 
-  // Group transaksi berdasarkan tanggal dengan memoization
-  const groupedTransactions = useMemo(() => {
+  // ✅ OPTIMIZED: Flatten transactions for better FlatList virtualization
+  // Instead of grouping, create flat array with date headers interleaved
+  const flattenedTransactions = useMemo(() => {
+    type FlatItem =
+      | { type: "header"; date: string; count: number }
+      | { type: "transaction"; data: Transaction };
+
     const grouped = filteredTransactions.reduce((acc, transaction) => {
       const dateKey = formatDate(transaction.date);
       if (!acc[dateKey]) {
@@ -428,30 +437,60 @@ export const AddTransactionScreen: React.FC = () => {
       return acc;
     }, {} as Record<string, Transaction[]>);
 
-    // Urutkan berdasarkan tanggal terbaru
-    const sortedKeys = Object.keys(grouped).sort((a, b) => {
-      const dateA = new Date(grouped[a][0].date);
-      const dateB = new Date(grouped[b][0].date);
-      return dateB.getTime() - dateA.getTime();
+    // Sort dates descending
+    // ✅ OPTIMIZED: Cache timestamps from first transaction in each group
+    const dateTimestamps: Record<string, number> = {};
+    Object.keys(grouped).forEach((key) => {
+      dateTimestamps[key] = new Date(grouped[key][0].date).getTime();
     });
 
-    return sortedKeys.map((dateKey) => ({
-      date: dateKey,
-      transactions: grouped[dateKey].sort((a, b) => {
-        // Urutkan transaksi dalam hari yang sama berdasarkan waktu
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      }),
-    }));
+    const sortedKeys = Object.keys(grouped).sort((a, b) => {
+      return dateTimestamps[b] - dateTimestamps[a];
+    });
+
+    // Flatten: [header, tx1, tx2, ..., header, tx3, tx4, ...]
+    const flattened: FlatItem[] = [];
+    sortedKeys.forEach((dateKey) => {
+      // ✅ OPTIMIZED: Cache timestamps before sorting
+      const txWithTimestamp = grouped[dateKey].map((tx) => ({
+        tx,
+        timestamp: new Date(tx.date).getTime(),
+      }));
+
+      const dayTransactions = txWithTimestamp
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .map((item) => item.tx);
+
+      // Add date header
+      flattened.push({
+        type: "header",
+        date: dateKey,
+        count: dayTransactions.length,
+      });
+
+      // Add transactions
+      dayTransactions.forEach((transaction) => {
+        flattened.push({ type: "transaction", data: transaction });
+      });
+    });
+
+    return flattened;
   }, [filteredTransactions]);
 
   // Statistik transaksi dengan memoization
   const { totalIncome, totalExpense } = useMemo(() => {
-    const income = filteredTransactions
-      .filter((t) => t.type === "income")
-      .reduce((sum, t) => sum + t.amount, 0);
-    const expense = filteredTransactions
-      .filter((t) => t.type === "expense")
-      .reduce((sum, t) => sum + t.amount, 0);
+    // ✅ OPTIMIZED: Single pass with .reduce() instead of two filter+reduce operations
+    const { income, expense } = filteredTransactions.reduce(
+      (acc, t) => {
+        if (t.type === "income") {
+          acc.income += t.amount;
+        } else if (t.type === "expense") {
+          acc.expense += t.amount;
+        }
+        return acc;
+      },
+      { income: 0, expense: 0 }
+    );
 
     return { totalIncome: income, totalExpense: expense };
   }, [filteredTransactions]);
@@ -460,145 +499,157 @@ export const AddTransactionScreen: React.FC = () => {
   const currentMonthName = getMonthName(month);
   const previousMonthName = getMonthName(month === 1 ? 12 : month - 1);
 
-  const renderHeader = () => (
-    <View>
-      {/* Filter Chips */}
-      <View style={styles.filterContainer}>
-        <Chip
-          selected={filter === "current"}
-          onPress={() => setFilter("current")}
-          style={styles.filterChip}
-        >
-          {currentMonthName} {year}
-        </Chip>
-        <Chip
-          selected={filter === "previous"}
-          onPress={() => setFilter("previous")}
-          style={styles.filterChip}
-        >
-          {previousMonthName}
-        </Chip>
-        <Chip
-          selected={filter === "all"}
-          onPress={() => setFilter("all")}
-          style={styles.filterChip}
-        >
-          Semua
-        </Chip>
-      </View>
+  const renderHeader = useCallback(
+    () => (
+      <View>
+        {/* Filter Chips */}
+        <View style={styles.filterContainer}>
+          <Chip
+            selected={filter === "current"}
+            onPress={() => setFilter("current")}
+            style={styles.filterChip}
+          >
+            {currentMonthName} {year}
+          </Chip>
+          <Chip
+            selected={filter === "previous"}
+            onPress={() => setFilter("previous")}
+            style={styles.filterChip}
+          >
+            {previousMonthName}
+          </Chip>
+          <Chip
+            selected={filter === "all"}
+            onPress={() => setFilter("all")}
+            style={styles.filterChip}
+          >
+            Semua
+          </Chip>
+        </View>
 
-      {/* Statistik */}
-      <Card style={styles.statsCard} elevation={2}>
-        <Card.Content>
-          <Text style={styles.statsTitle}>Ringkasan Transaksi</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <MaterialIcons name="trending-up" size={20} color="#4CAF50" />
-              <Text style={styles.statLabel}>Pemasukan</Text>
-              <Text style={[styles.statValue, { color: "#4CAF50" }]}>
-                {formatCurrency(totalIncome)}
-              </Text>
-            </View>
-            <Divider style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <MaterialIcons name="trending-down" size={20} color="#F44336" />
-              <Text style={styles.statLabel}>Pengeluaran</Text>
-              <Text style={[styles.statValue, { color: "#F44336" }]}>
-                {formatCurrency(totalExpense)}
-              </Text>
-            </View>
-          </View>
-          <Divider style={styles.divider} />
-          <View style={styles.netIncomeContainer}>
-            <Text style={styles.netIncomeLabel}>Saldo Bersih:</Text>
-            <Text
-              style={[
-                styles.netIncomeValue,
-                {
-                  color:
-                    totalIncome - totalExpense >= 0 ? "#4CAF50" : "#F44336",
-                },
-              ]}
-            >
-              {formatCurrency(totalIncome - totalExpense)}
-            </Text>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Accordion Header Riwayat Transaksi */}
-      <TouchableOpacity
-        style={styles.historyAccordion}
-        onPress={() => setShowHistory(!showHistory)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.accordionHeader}>
-          <View style={styles.historyTitleContainer}>
-            <MaterialIcons name="history" size={24} color="#2196F3" />
-            <View style={styles.historyTitleTextContainer}>
-              <Text style={styles.historyTitle}>Riwayat Transaksi</Text>
-              <Text style={styles.historySubtitle}>
-                {filter === "current" && `${currentMonthName} ${year}`}
-                {filter === "previous" &&
-                  `${previousMonthName} ${month === 1 ? year - 1 : year}`}
-                {filter === "all" && "Semua Periode"}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.accordionRight}>
-            {filteredTransactions.length > 0 && (
-              <View style={styles.transactionBadge}>
-                <Text style={styles.transactionBadgeText}>
-                  {showHistory
-                    ? filteredTransactions.length
-                    : Math.min(historyLimit, filteredTransactions.length)}
+        {/* Statistik */}
+        <Card style={styles.statsCard} elevation={2}>
+          <Card.Content>
+            <Text style={styles.statsTitle}>Ringkasan Transaksi</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <MaterialIcons name="trending-up" size={20} color="#4CAF50" />
+                <Text style={styles.statLabel}>Pemasukan</Text>
+                <Text style={[styles.statValue, { color: "#4CAF50" }]}>
+                  {formatCurrency(totalIncome)}
                 </Text>
               </View>
-            )}
-            <MaterialIcons
-              name={showHistory ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-              size={28}
-              color="#2196F3"
-            />
+              <Divider style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <MaterialIcons name="trending-down" size={20} color="#F44336" />
+                <Text style={styles.statLabel}>Pengeluaran</Text>
+                <Text style={[styles.statValue, { color: "#F44336" }]}>
+                  {formatCurrency(totalExpense)}
+                </Text>
+              </View>
+            </View>
+            <Divider style={styles.divider} />
+            <View style={styles.netIncomeContainer}>
+              <Text style={styles.netIncomeLabel}>Saldo Bersih:</Text>
+              <Text
+                style={[
+                  styles.netIncomeValue,
+                  {
+                    color:
+                      totalIncome - totalExpense >= 0 ? "#4CAF50" : "#F44336",
+                  },
+                ]}
+              >
+                {formatCurrency(totalIncome - totalExpense)}
+              </Text>
+            </View>
+          </Card.Content>
+        </Card>
+
+        {/* Accordion Header Riwayat Transaksi */}
+        <TouchableOpacity
+          style={styles.historyAccordion}
+          onPress={() => setShowHistory(!showHistory)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.accordionHeader}>
+            <View style={styles.historyTitleContainer}>
+              <MaterialIcons name="history" size={24} color="#2196F3" />
+              <View style={styles.historyTitleTextContainer}>
+                <Text style={styles.historyTitle}>Riwayat Transaksi</Text>
+                <Text style={styles.historySubtitle}>
+                  {filter === "current" && `${currentMonthName} ${year}`}
+                  {filter === "previous" &&
+                    `${previousMonthName} ${month === 1 ? year - 1 : year}`}
+                  {filter === "all" && "Semua Periode"}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.accordionRight}>
+              {filteredTransactions.length > 0 && (
+                <View style={styles.transactionBadge}>
+                  <Text style={styles.transactionBadgeText}>
+                    {showHistory
+                      ? filteredTransactions.length
+                      : Math.min(historyLimit, filteredTransactions.length)}
+                  </Text>
+                </View>
+              )}
+              <MaterialIcons
+                name={showHistory ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                size={28}
+                color="#2196F3"
+              />
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
-    </View>
+        </TouchableOpacity>
+      </View>
+    ),
+    [
+      filter,
+      currentMonthName,
+      previousMonthName,
+      year,
+      month,
+      totalIncome,
+      totalExpense,
+      filteredTransactions.length,
+      showHistory,
+      historyLimit,
+    ]
   );
 
-  const renderTransactionGroup = ({
-    item,
-  }: {
-    item: { date: string; transactions: Transaction[] };
-  }) => (
-    <View style={styles.transactionGroup}>
-      {/* Date Header with better visual separation */}
-      <View style={styles.dateHeaderCard}>
-        <View style={styles.dateHeaderContent}>
-          <View style={styles.dateHeaderLeft}>
-            <MaterialIcons name="event" size={20} color="#2196F3" />
-            <Text style={styles.dateHeaderText}>{item.date}</Text>
+  const renderItem = useCallback(
+    ({
+      item,
+    }: {
+      item:
+        | { type: "header"; date: string; count: number }
+        | { type: "transaction"; data: Transaction };
+    }) => {
+      if (item.type === "header") {
+        // Render date header
+        return (
+          <View style={styles.dateHeaderCard}>
+            <View style={styles.dateHeaderContent}>
+              <View style={styles.dateHeaderLeft}>
+                <MaterialIcons name="event" size={20} color="#2196F3" />
+                <Text style={styles.dateHeaderText}>{item.date}</Text>
+              </View>
+              <View style={styles.transactionCountBadge}>
+                <Text style={styles.transactionCountInGroup}>{item.count}</Text>
+              </View>
+            </View>
           </View>
-          <View style={styles.transactionCountBadge}>
-            <Text style={styles.transactionCountInGroup}>
-              {item.transactions.length}
-            </Text>
-          </View>
-        </View>
-      </View>
-      {/* Transaction Items */}
-      <View style={styles.transactionItemsContainer}>
-        {item.transactions.map((transaction) => (
-          <TransactionItem
-            key={transaction.id!.toString()}
-            transaction={transaction}
-            categories={categories}
-          />
-        ))}
-      </View>
-      {/* Separator line */}
-      <View style={styles.groupSeparator} />
-    </View>
+        );
+      }
+
+      // Render transaction item
+      return (
+        <TransactionItem transaction={item.data} categories={categories} />
+      );
+    },
+    [categories]
   );
 
   return (
@@ -608,9 +659,19 @@ export const AddTransactionScreen: React.FC = () => {
       </Appbar.Header>
 
       <FlatList
-        data={groupedTransactions}
-        renderItem={renderTransactionGroup}
-        keyExtractor={(item) => item.date}
+        data={flattenedTransactions}
+        renderItem={renderItem}
+        keyExtractor={useCallback(
+          (
+            item:
+              | { type: "header"; date: string; count: number }
+              | { type: "transaction"; data: Transaction }
+          ) =>
+            item.type === "header"
+              ? `header-${item.date}`
+              : `transaction-${item.data.id}`,
+          []
+        )}
         ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}

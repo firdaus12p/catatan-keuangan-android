@@ -166,7 +166,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const data = await database.getAllCategories();
       setCategories(data);
     } catch (error) {
-      console.error("Error loading categories:", error);
     }
   }, []);
 
@@ -176,7 +175,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         await database.addCategory(category);
         await loadCategories(); // Refresh data
       } catch (error) {
-        console.error("Error adding category:", error);
         throw error;
       }
     },
@@ -189,7 +187,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         await database.updateCategory(id, category);
         await loadCategories(); // Refresh data
       } catch (error) {
-        console.error("Error updating category:", error);
         throw error;
       }
     },
@@ -202,7 +199,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         await database.deleteCategory(id);
         await loadCategories(); // Refresh data
       } catch (error) {
-        console.error("Error deleting category:", error);
         throw error;
       }
     },
@@ -223,7 +219,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         );
         await loadCategories();
       } catch (error) {
-        console.error("Error transferring category balance:", error);
         throw error;
       }
     },
@@ -236,7 +231,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const data = await database.getExpenseTypes();
       setExpenseTypes(data);
     } catch (error) {
-      console.error("Error loading expense types:", error);
     }
   }, []);
 
@@ -245,7 +239,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       try {
         return await database.getExpenseTypeTotalsByMonth(year, month);
       } catch (error) {
-        console.error("Error getting expense type totals by month:", error);
         throw error;
       }
     },
@@ -259,7 +252,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         await loadExpenseTypes();
         return insertedId;
       } catch (error) {
-        console.error("Error adding expense type:", error);
         throw error;
       }
     },
@@ -272,7 +264,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         await database.updateExpenseType(id, name);
         await loadExpenseTypes();
       } catch (error) {
-        console.error("Error updating expense type:", error);
         throw error;
       }
     },
@@ -285,7 +276,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         await database.deleteExpenseType(id);
         await loadExpenseTypes();
       } catch (error) {
-        console.error("Error deleting expense type:", error);
         throw error;
       }
     },
@@ -309,7 +299,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
         if (append) {
           // ✅ PAGINATION: Append mode untuk infinite scroll
-          setTransactions((prev) => [...prev, ...data]);
+          // ✅ OPTIMIZED: Use .concat() instead of spread for better performance
+          setTransactions((prev) => prev.concat(data));
         } else {
           // Replace mode untuk initial load atau refresh
           setTransactions(data);
@@ -344,12 +335,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
               }
             } catch (error) {
               // Silent failure untuk cleanup - tidak mengganggu user experience
-              console.warn("[CLEANUP] Cleanup failed:", error);
             }
           });
         }
       } catch (error) {
-        console.error("Error loading transactions:", error);
         throw error;
       }
     },
@@ -363,7 +352,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       await loadTransactions(50, transactionOffsetRef.current, true); // append=true
     } catch (error) {
-      console.error("Error loading more transactions:", error);
       throw error;
     }
   }, [hasMoreTransactions, loadTransactions]);
@@ -393,7 +381,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           totalOutstandingLoans,
         });
       } catch (error) {
-        console.error("Error loading monthly stats:", error);
       }
     },
     []
@@ -404,7 +391,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const totalIncome = await database.getTotalIncome();
       setTotalAllTimeBalance(totalIncome);
     } catch (error) {
-      console.error("Error loading total all-time balance:", error);
     }
   }, []);
 
@@ -431,7 +417,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
         await Promise.all(refreshTasks);
       } catch (error) {
-        console.error("Error adding transaction:", error);
         throw error;
       }
     },
@@ -484,7 +469,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const data = await database.getAllLoans();
       setLoans(data);
     } catch (error) {
-      console.error("Error loading loans:", error);
     }
   }, []);
 
@@ -506,7 +490,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         setLoans(loansData);
         setExpenseTypes(expenseTypesData);
       } catch (error) {
-        console.error("Error loading all data:", error);
       } finally {
         setLoading(false);
       }
@@ -521,7 +504,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         // ✅ OPTIMIZED: Parallel data refresh
         await Promise.all([loadLoans(), loadCategories(), loadTransactions()]);
       } catch (error) {
-        console.error("Error adding loan:", error);
         throw error;
       }
     },
@@ -539,7 +521,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         // ✅ OPTIMIZED: Parallel data refresh
         await Promise.all([loadLoans(), loadCategories(), loadTransactions()]);
       } catch (error) {
-        console.error("Error updating loan status:", error);
         throw error;
       }
     },
@@ -553,7 +534,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         // ✅ OPTIMIZED: Parallel data refresh
         await Promise.all([loadLoans(), loadCategories()]);
       } catch (error) {
-        console.error("Error deleting loan:", error);
         throw error;
       }
     },
@@ -566,7 +546,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       try {
         return await database.getLoanPayments(loanId);
       } catch (error) {
-        console.error("Error getting loan payments:", error);
         throw error;
       }
     },
@@ -654,7 +633,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       await initializeNotifications();
     } catch (error) {
-      console.error("Error initializing notifications:", error);
     }
   }, []);
 

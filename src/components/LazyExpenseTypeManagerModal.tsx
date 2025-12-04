@@ -40,7 +40,6 @@ export const LazyExpenseTypeManagerModal: React.FC<
           setIsComponentReady(true);
           setIsLoadingModal(false);
         } catch (error) {
-          console.error("Failed to load ExpenseTypeManagerModal:", error);
           setIsLoadingModal(false);
           setIsComponentReady(false);
         }

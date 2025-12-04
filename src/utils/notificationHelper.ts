@@ -58,7 +58,6 @@ const getNotifications = async () => {
         });
       }
     } catch (error) {
-      console.warn("expo-notifications not available in this environment");
       return null;
     }
   }
@@ -86,7 +85,6 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
   try {
     const notificationModule = await getNotifications();
     if (!notificationModule) {
-      console.warn("Notifications not supported in this environment");
       return false;
     }
 
@@ -101,17 +99,8 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
 
     return finalStatus === "granted";
   } catch (error) {
-    console.error("Error requesting notification permissions:", error);
-
-    // Jika error terkait Expo Go, berikan pesan yang lebih informatif
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes("expo-notifications")) {
-      console.warn(
-        "Running in Expo Go - some notification features may be limited"
-      );
-      return false;
-    }
-
+    // ✅ OPTIMIZED: Silent error handling - no console.error in production
+    // Jika error terkait Expo Go atau permission issues, silently return false
     return false;
   }
 };
@@ -128,7 +117,6 @@ export const saveNotificationSettings = async (
       JSON.stringify(settings)
     );
   } catch (error) {
-    console.error("Error saving notification settings:", error);
     throw error;
   }
 };
@@ -147,7 +135,6 @@ export const loadNotificationSettings =
       }
       return null;
     } catch (error) {
-      console.error("Error loading notification settings:", error);
       return null;
     }
   };
@@ -164,7 +151,6 @@ export const getDeviceTimezone = (): string => {
     }
     return "ID"; // Default Indonesia
   } catch (error) {
-    console.error("Error getting device timezone:", error);
     return "ID";
   }
 };
@@ -273,8 +259,6 @@ export const scheduleNotification = async (
 
     return notificationId;
   } catch (error) {
-    console.error("Error scheduling notification:", error);
-
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     // Handle specific Android/Expo Go errors
@@ -316,7 +300,6 @@ export const cancelScheduledNotification = async (): Promise<void> => {
   try {
     const notificationModule = await getNotifications();
     if (!notificationModule) {
-      console.warn("Notifications not available - cannot cancel");
       return;
     }
 
@@ -337,7 +320,6 @@ export const cancelScheduledNotification = async (): Promise<void> => {
     // Batalkan semua notifikasi yang pending (sebagai fallback)
     await notificationModule.cancelAllScheduledNotificationsAsync();
   } catch (error) {
-    console.error("Error canceling scheduled notification:", error);
     throw error;
   }
 };
@@ -356,7 +338,6 @@ export const checkScheduledNotifications = async (): Promise<boolean> => {
       await notificationModule.getAllScheduledNotificationsAsync();
     return scheduledNotifications.length > 0;
   } catch (error) {
-    console.error("Error checking scheduled notifications:", error);
     return false;
   }
 };
@@ -369,9 +350,7 @@ export const initializeNotifications = async (): Promise<void> => {
     // Check notification support first
     const notificationModule = await getNotifications();
     if (!notificationModule) {
-      console.warn(
-        "Notifications not supported in this environment - skipping initialization"
-      );
+      // ✅ OPTIMIZED: Silent return - no console.warn in production
       return;
     }
 
@@ -399,9 +378,7 @@ export const initializeNotifications = async (): Promise<void> => {
         }
       }
     }
-  } catch (error) {
-    console.error("Error initializing notifications:", error);
-  }
+  } catch (error) {}
 };
 
 /**

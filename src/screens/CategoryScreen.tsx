@@ -1,13 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  FlatList,
-  InteractionManager,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   Appbar,
@@ -75,11 +69,6 @@ export const CategoryScreen: React.FC = () => {
     setModalVisible(true);
   }, [resetForm]);
 
-  useEffect(() => {
-    router.prefetch({ pathname: "/(tabs)/transaction" });
-    router.prefetch({ pathname: "/(tabs)/loan" });
-  }, [router]);
-
   // Handle floating action button actions
   useEffect(() => {
     if (action === "add") {
@@ -92,42 +81,34 @@ export const CategoryScreen: React.FC = () => {
   // Refresh data saat screen difokuskan
   useFocusEffect(
     React.useCallback(() => {
-      let isMounted = true;
-      const task = InteractionManager.runAfterInteractions(() => {
-        if (!isMounted) return;
-        loadCategories();
-      });
-
-      return () => {
-        isMounted = false;
-        if (task && typeof task.cancel === "function") {
-          task.cancel();
-        }
-      };
+      loadCategories();
     }, [loadCategories])
   );
 
-  const openEditModal = (category: Category) => {
+  const openEditModal = useCallback((category: Category) => {
     setEditingCategory(category);
     setFormData({
       name: category.name,
       percentage: category.percentage.toString(),
     });
     setModalVisible(true);
-  };
+  }, []);
 
   const closeModal = () => {
     setModalVisible(false);
     resetForm();
   };
 
-  const openTransferModal = (category: Category) => {
-    setTransferSourceCategory(category);
-    const defaultTarget = categories.find((cat) => cat.id !== category.id);
-    setTransferTargetId(defaultTarget?.id?.toString() ?? "");
-    setTransferAmount("");
-    setTransferModalVisible(true);
-  };
+  const openTransferModal = useCallback(
+    (category: Category) => {
+      setTransferSourceCategory(category);
+      const defaultTarget = categories.find((cat) => cat.id !== category.id);
+      setTransferTargetId(defaultTarget?.id?.toString() ?? "");
+      setTransferAmount("");
+      setTransferModalVisible(true);
+    },
+    [categories]
+  );
 
   const closeTransferModal = () => {
     setTransferModalVisible(false);
@@ -188,19 +169,20 @@ export const CategoryScreen: React.FC = () => {
       );
     } catch (error) {
       showError("Gagal menyimpan kategori");
-      console.error("Error saving category:", error);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    try {
-      await deleteCategory(id);
-      showSuccess("Kategori berhasil dihapus");
-    } catch (error) {
-      showError("Gagal menghapus kategori");
-      console.error("Error deleting category:", error);
-    }
-  };
+  const handleDelete = useCallback(
+    async (id: number) => {
+      try {
+        await deleteCategory(id);
+        showSuccess("Kategori berhasil dihapus");
+      } catch (error) {
+        showError("Gagal menghapus kategori");
+      }
+    },
+    [deleteCategory, showSuccess, showError]
+  );
 
   // Hitung total saldo dan persentase dengan memoization
   const { totalBalance, totalPercentage } = useMemo(() => {
@@ -269,59 +251,68 @@ export const CategoryScreen: React.FC = () => {
       );
       closeTransferModal();
     } catch (error) {
-      console.error("Error transferring category balance:", error);
       showError("Gagal memindahkan saldo kategori");
     } finally {
       setTransferLoading(false);
     }
   };
 
-  const renderHeader = () => (
-    <Surface style={styles.summaryContainer} elevation={1}>
-      <Text style={styles.summaryTitle}>Ringkasan Kategori</Text>
-      <View style={styles.summaryRow}>
-        <Text style={styles.summaryLabel}>Total Saldo:</Text>
-        <Text style={styles.summaryValue}>{formatCurrency(totalBalance)}</Text>
-      </View>
-      <View style={styles.summaryRow}>
-        <Text style={styles.summaryLabel}>Total Alokasi:</Text>
-        <Text
-          style={[
-            styles.summaryValue,
-            {
-              color:
-                totalPercentage > 100
-                  ? "#F44336"
-                  : totalPercentage === 100
-                  ? "#4CAF50"
-                  : "#FF9800",
-            },
-          ]}
-        >
-          {totalPercentage.toFixed(1)}%
-        </Text>
-      </View>
-      {totalPercentage !== 100 && (
-        <Text style={styles.warningText}>
-          {totalPercentage > 100
-            ? `Alokasi melebihi 100% sebesar ${(totalPercentage - 100).toFixed(
-                1
-              )}%`
-            : `Sisa alokasi: ${(100 - totalPercentage).toFixed(1)}%`}
-        </Text>
-      )}
-      <Divider style={styles.divider} />
-    </Surface>
+  const renderHeader = useCallback(
+    () => (
+      <Surface style={styles.summaryContainer} elevation={1}>
+        <Text style={styles.summaryTitle}>Ringkasan Kategori</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Total Saldo:</Text>
+          <Text style={styles.summaryValue}>
+            {formatCurrency(totalBalance)}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Total Alokasi:</Text>
+          <Text
+            style={[
+              styles.summaryValue,
+              {
+                color:
+                  totalPercentage > 100
+                    ? "#F44336"
+                    : totalPercentage === 100
+                    ? "#4CAF50"
+                    : "#FF9800",
+              },
+            ]}
+          >
+            {totalPercentage.toFixed(1)}%
+          </Text>
+        </View>
+        {totalPercentage !== 100 && (
+          <Text style={styles.warningText}>
+            {totalPercentage > 100
+              ? `Alokasi melebihi 100% sebesar ${(
+                  totalPercentage - 100
+                ).toFixed(1)}%`
+              : `Sisa alokasi: ${(100 - totalPercentage).toFixed(1)}%`}
+          </Text>
+        )}
+        <Divider style={styles.divider} />
+      </Surface>
+    ),
+    [totalBalance, totalPercentage]
   );
 
-  const renderCategoryItem = ({ item }: { item: Category }) => (
-    <CategoryCard
-      category={item}
-      onEdit={openEditModal}
-      onDelete={handleDelete}
-      onTransfer={openTransferModal}
-    />
+  const renderCategoryItem = useCallback(
+    ({ item }: { item: Category }) => (
+      <CategoryCard
+        category={item}
+        onEdit={openEditModal}
+        onDelete={handleDelete}
+        onTransfer={openTransferModal}
+      />
+    ),
+    [openEditModal, handleDelete, openTransferModal]
   );
+
+  const keyExtractor = useCallback((item: Category) => item.id!.toString(), []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -335,7 +326,7 @@ export const CategoryScreen: React.FC = () => {
       <FlatList
         data={categories}
         renderItem={renderCategoryItem}
-        keyExtractor={(item) => item.id!.toString()}
+        keyExtractor={keyExtractor}
         ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}

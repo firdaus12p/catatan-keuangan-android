@@ -96,7 +96,6 @@ export const ResetScreen: React.FC = () => {
         balances: false,
       });
     } catch (error) {
-      console.error("Error resetting data:", error);
       showError("Terjadi kesalahan saat mereset data");
     }
   };

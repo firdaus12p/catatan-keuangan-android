@@ -68,7 +68,6 @@ class Database {
         await this.db.getFirstAsync("SELECT 1");
         return;
       } catch (error) {
-        console.warn("Database connection lost, reinitializing...", error);
         this.db = null;
       }
     }
@@ -198,7 +197,6 @@ class Database {
 
       // Database initialized successfully - ready for production
     } catch (error) {
-      console.error("Error initializing database:", error);
       this.db = null;
       throw error;
     } finally {
@@ -235,7 +233,6 @@ class Database {
         // Default categories inserted successfully
       }
     } catch (error) {
-      console.error("Error inserting default categories:", error);
       throw error;
     }
   }
@@ -345,7 +342,6 @@ class Database {
         );
       }
     } catch (error) {
-      console.error("Error populating monthly aggregates:", error);
       // Silent failure - migration tidak critical
     }
   }
@@ -387,7 +383,6 @@ class Database {
         }
       }
     } catch (error) {
-      console.error("Error inserting default expense types:", error);
       throw error;
     }
   }
@@ -414,11 +409,11 @@ class Database {
     await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
+      // ✅ OPTIMIZED: Explicit column selection instead of SELECT *
       return await this.db.getAllAsync(
-        "SELECT * FROM categories ORDER BY name"
+        "SELECT id, name, percentage, balance FROM categories ORDER BY name"
       );
     } catch (error) {
-      console.error("Error getting categories:", error);
       throw error;
     }
   }
@@ -433,7 +428,6 @@ class Database {
       );
       return result.lastInsertRowId;
     } catch (error) {
-      console.error("Error adding category:", error);
       throw error;
     }
   }
@@ -450,7 +444,6 @@ class Database {
         [category.name, category.percentage, category.balance, id]
       );
     } catch (error) {
-      console.error("Error updating category:", error);
       throw error;
     }
   }
@@ -461,7 +454,6 @@ class Database {
     try {
       await this.db.runAsync("DELETE FROM categories WHERE id = ?", [id]);
     } catch (error) {
-      console.error("Error deleting category:", error);
       throw error;
     }
   }
@@ -527,7 +519,6 @@ class Database {
         "SELECT id, name, total_spent FROM expense_types ORDER BY name"
       );
     } catch (error) {
-      console.error("Error getting expense types:", error);
       throw error;
     }
   }
@@ -538,7 +529,6 @@ class Database {
     try {
       return await this.insertExpenseTypeRow(name.trim(), 0);
     } catch (error) {
-      console.error("Error adding expense type:", error);
       throw error;
     }
   }
@@ -552,7 +542,6 @@ class Database {
         id,
       ]);
     } catch (error) {
-      console.error("Error updating expense type:", error);
       throw error;
     }
   }
@@ -569,7 +558,6 @@ class Database {
         await txn.runAsync("DELETE FROM expense_types WHERE id = ?", [id]);
       });
     } catch (error) {
-      console.error("Error deleting expense type:", error);
       throw error;
     }
   }
@@ -589,7 +577,6 @@ class Database {
         ), 0)
       `);
     } catch (error) {
-      console.error("Error recalculating expense type totals:", error);
       throw error;
     }
   }
@@ -613,7 +600,6 @@ class Database {
         [limit, offset]
       );
     } catch (error) {
-      console.error("Error getting transactions:", error);
       throw error;
     }
   }
@@ -672,7 +658,6 @@ class Database {
 
       return insertedId;
     } catch (error) {
-      console.error("Error adding transaction:", error);
       throw error;
     }
   }
@@ -820,11 +805,11 @@ class Database {
     await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
+      // ✅ OPTIMIZED: Explicit column selection instead of SELECT *
       return await this.db.getAllAsync(
-        "SELECT * FROM loans ORDER BY date DESC"
+        "SELECT id, name, amount, category_id, status, date, note FROM loans ORDER BY date DESC"
       );
     } catch (error) {
-      console.error("Error getting loans:", error);
       throw error;
     }
   }
@@ -856,7 +841,6 @@ class Database {
 
       return insertedId;
     } catch (error) {
-      console.error("Error adding loan:", error);
       throw error;
     }
   }
@@ -870,8 +854,9 @@ class Database {
     if (!this.db) throw new Error("Database not initialized");
     try {
       await this.db.withExclusiveTransactionAsync(async (txn) => {
+        // ✅ OPTIMIZED: Explicit column selection instead of SELECT *
         const loan = (await txn.getFirstAsync(
-          "SELECT * FROM loans WHERE id = ?",
+          "SELECT id, name, amount, category_id, status, date, note FROM loans WHERE id = ?",
           [id]
         )) as Loan;
 
@@ -932,7 +917,6 @@ class Database {
         }
       });
     } catch (error) {
-      console.error("Error updating loan status:", error);
       throw error;
     }
   }
@@ -943,7 +927,6 @@ class Database {
     try {
       await this.db.runAsync("DELETE FROM loans WHERE id = ?", [id]);
     } catch (error) {
-      console.error("Error deleting loan:", error);
       throw error;
     }
   }
@@ -981,7 +964,6 @@ class Database {
         );
       }
     } catch (error) {
-      console.error("Error updating monthly aggregate:", error);
       // Silent failure - aggregate adalah fitur tambahan
     }
   }
@@ -1039,7 +1021,6 @@ class Database {
         totalExpense: 0,
       };
     } catch (error) {
-      console.error("Error getting monthly stats:", error);
       throw error;
     }
   }
@@ -1072,7 +1053,6 @@ class Database {
         [yearStr, monthStr]
       );
     } catch (error) {
-      console.error("Error getting expense type totals by month:", error);
       throw error;
     }
   }
@@ -1086,7 +1066,6 @@ class Database {
       )) as { total: number };
       return result.total;
     } catch (error) {
-      console.error("Error getting total income:", error);
       throw error;
     }
   }
@@ -1096,12 +1075,12 @@ class Database {
     await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
+      // ✅ OPTIMIZED: Explicit column selection instead of SELECT *
       return await this.db.getAllAsync(
-        "SELECT * FROM loan_payments WHERE loan_id = ? ORDER BY payment_date DESC",
+        "SELECT id, loan_id, amount, payment_date, remaining_amount FROM loan_payments WHERE loan_id = ? ORDER BY payment_date DESC",
         [loanId]
       );
     } catch (error) {
-      console.error("Error getting loan payments:", error);
       throw error;
     }
   }
@@ -1110,11 +1089,11 @@ class Database {
     await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
     try {
+      // ✅ OPTIMIZED: Explicit column selection instead of SELECT *
       return await this.db.getAllAsync(
-        "SELECT * FROM loan_payments ORDER BY payment_date DESC"
+        "SELECT id, loan_id, amount, payment_date, remaining_amount FROM loan_payments ORDER BY payment_date DESC"
       );
     } catch (error) {
-      console.error("Error getting all loan payments:", error);
       throw error;
     }
   }
@@ -1131,7 +1110,6 @@ class Database {
       await this.db.execAsync("UPDATE categories SET balance = 0");
       await this.recalculateExpenseTypeTotals();
     } catch (error) {
-      console.error("Error resetting all data:", error);
       throw error;
     }
   }
@@ -1157,7 +1135,6 @@ class Database {
 
       console.log("[RESET] All transactions, aggregates, and balances cleared");
     } catch (error) {
-      console.error("Error resetting transactions:", error);
       throw error;
     }
   }
@@ -1169,7 +1146,6 @@ class Database {
       await this.db.execAsync("DELETE FROM loan_payments");
       await this.db.execAsync("DELETE FROM loans");
     } catch (error) {
-      console.error("Error resetting loans:", error);
       throw error;
     }
   }
@@ -1180,7 +1156,6 @@ class Database {
     try {
       await this.db.execAsync("DELETE FROM categories");
     } catch (error) {
-      console.error("Error resetting categories:", error);
       throw error;
     }
   }
@@ -1191,7 +1166,6 @@ class Database {
     try {
       await this.db.execAsync("UPDATE categories SET balance = 0");
     } catch (error) {
-      console.error("Error resetting category balances:", error);
       throw error;
     }
   }
@@ -1208,7 +1182,6 @@ class Database {
       // Loan-related transactions cleaned up successfully
       await this.recalculateExpenseTypeTotals();
     } catch (error) {
-      console.error("Error cleaning up loan transactions:", error);
       throw error;
     }
   }
@@ -1267,7 +1240,6 @@ class Database {
         error instanceof Error
           ? error.message
           : "Gagal membersihkan transaksi lama";
-      console.error("[CLEANUP TEST] Error:", errorMessage);
       throw new Error(errorMessage);
     }
   }

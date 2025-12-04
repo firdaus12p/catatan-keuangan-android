@@ -69,7 +69,6 @@ export const ExpenseTypeManagerModal: React.FC<ExpenseTypeManagerModalProps> =
           }
           resetForm();
         } catch (error) {
-          console.error("Error saving expense type:", error);
           showError(
             editingId
               ? "Gagal memperbarui jenis pengeluaran."
@@ -101,7 +100,6 @@ export const ExpenseTypeManagerModal: React.FC<ExpenseTypeManagerModalProps> =
                   resetForm();
                 }
               } catch (error) {
-                console.error("Error deleting expense type:", error);
                 showError("Gagal menghapus jenis pengeluaran.");
               } finally {
                 setSubmitting(false);

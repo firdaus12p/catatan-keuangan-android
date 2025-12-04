@@ -8,7 +8,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { InteractionManager, ScrollView, StyleSheet } from "react-native";
+import { ScrollView, StyleSheet } from "react-native";
 import { Appbar } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CategoryBalanceCard } from "../components/CategoryBalanceCard";
@@ -165,19 +165,28 @@ export const HomeScreen: React.FC = () => {
     [animatedCategory1Balance, animatedCategory2Balance]
   );
 
-  const resolvePeriodDate = useCallback((period: "current" | "previous") => {
+  // ✅ OPTIMIZED: Memoize current date to avoid repeated Date creation
+  const currentDate = useMemo(() => {
     const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-
-    if (period === "current") {
-      return { month: currentMonth, year: currentYear };
-    }
-
-    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-    return { month: prevMonth, year: prevYear };
+    return {
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+    };
   }, []);
+
+  const resolvePeriodDate = useCallback(
+    (period: "current" | "previous") => {
+      if (period === "current") {
+        return currentDate;
+      }
+
+      const prevMonth = currentDate.month === 1 ? 12 : currentDate.month - 1;
+      const prevYear =
+        currentDate.month === 1 ? currentDate.year - 1 : currentDate.year;
+      return { month: prevMonth, year: prevYear };
+    },
+    [currentDate]
+  );
 
   const refreshExpenseBreakdown = useCallback(
     async (period: "current" | "previous") => {
@@ -209,15 +218,10 @@ export const HomeScreen: React.FC = () => {
         await refreshExpenseBreakdown(selectedPeriod);
       };
 
-      const interaction = InteractionManager.runAfterInteractions(() => {
-        void initApp();
-      });
+      void initApp();
 
       return () => {
         cancelled = true;
-        if (interaction && typeof interaction.cancel === "function") {
-          interaction.cancel();
-        }
       };
     }, [
       initializeApp,
@@ -241,7 +245,6 @@ export const HomeScreen: React.FC = () => {
           setSelectedCategoryIds(parsed);
         }
       } catch (error) {
-        console.error("Error loading selected categories:", error);
       } finally {
         setIsLoadingSelection(false);
       }
@@ -282,18 +285,20 @@ export const HomeScreen: React.FC = () => {
       if (isSelected) {
         newSelection = prev.filter((id) => id !== categoryId);
       } else if (prev.length < 2) {
-        newSelection = [...prev, categoryId];
+        // ✅ OPTIMIZED: Use .concat() for single item append
+        newSelection = prev.concat(categoryId);
       } else {
         return prev;
       }
 
       // Save ke AsyncStorage
+      // ✅ OPTIMIZED: Silent error handling - no console.error in production
       AsyncStorage.setItem(
         "@selectedCategoryIds",
         JSON.stringify(newSelection)
-      ).catch((error) =>
-        console.error("Error saving selected categories:", error)
-      );
+      ).catch(() => {
+        // Silently fail - AsyncStorage errors are non-critical
+      });
 
       return newSelection;
     });
@@ -304,9 +309,7 @@ export const HomeScreen: React.FC = () => {
   }, []);
 
   const openExpenseTypeManager = useCallback(() => {
-    InteractionManager.runAfterInteractions(() => {
-      setExpenseTypeManagerVisible(true);
-    });
+    setExpenseTypeManagerVisible(true);
   }, []);
 
   const closeExpenseTypeManager = useCallback(() => {

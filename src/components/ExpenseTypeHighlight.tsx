@@ -28,13 +28,12 @@ export const ExpenseTypeHighlight = React.memo<ExpenseTypeHighlightProps>(
       [expenseTypeBreakdown]
     );
 
-    const sortedExpenseTypes = useMemo(
-      () =>
-        [...expenseTypeBreakdown].sort(
-          (a, b) => (b.total_spent ?? 0) - (a.total_spent ?? 0)
-        ),
-      [expenseTypeBreakdown]
-    );
+    const sortedExpenseTypes = useMemo(() => {
+      // ✅ OPTIMIZED: Use .slice() before sort to avoid spread overhead
+      return expenseTypeBreakdown
+        .slice()
+        .sort((a, b) => (b.total_spent ?? 0) - (a.total_spent ?? 0));
+    }, [expenseTypeBreakdown]);
 
     const handleOpenManager = useCallback(() => {
       InteractionManager.runAfterInteractions(() => {

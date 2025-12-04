@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
-  InteractionManager,
   Modal as RNModal,
   ScrollView,
   StyleSheet,
@@ -295,6 +294,32 @@ export const LoanScreen: React.FC = () => {
     note: "", // Catatan tujuan pinjaman
   });
 
+  // Refresh data saat screen difokuskan
+  useFocusEffect(
+    React.useCallback(() => {
+      Promise.all([loadCategories(), loadLoans()]);
+    }, [loadCategories, loadLoans])
+  );
+
+  const resetForm = useCallback(() => {
+    setFormData({
+      name: "",
+      amount: "",
+      categoryId: "",
+      note: "",
+    });
+  }, []);
+
+  const openModal = useCallback(() => {
+    resetForm();
+    setModalVisible(true);
+  }, [resetForm]);
+
+  const closeModal = useCallback(() => {
+    setModalVisible(false);
+    resetForm();
+  }, [resetForm]);
+
   // Handle floating action button actions
   useEffect(() => {
     if (action === "add") {
@@ -302,44 +327,7 @@ export const LoanScreen: React.FC = () => {
       // Clear parameter setelah digunakan
       router.replace("/(tabs)/loan");
     }
-  }, [action]);
-
-  // Refresh data saat screen difokuskan
-  useFocusEffect(
-    React.useCallback(() => {
-      let isMounted = true;
-      const task = InteractionManager.runAfterInteractions(async () => {
-        if (!isMounted) return;
-        await Promise.all([loadCategories(), loadLoans()]);
-      });
-
-      return () => {
-        isMounted = false;
-        if (task && typeof task.cancel === "function") {
-          task.cancel();
-        }
-      };
-    }, [loadCategories, loadLoans])
-  );
-
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      amount: "",
-      categoryId: "",
-      note: "",
-    });
-  };
-
-  const openModal = () => {
-    resetForm();
-    setModalVisible(true);
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    resetForm();
-  };
+  }, [action, router, openModal]);
 
   const validateForm = (): boolean => {
     if (!validateNonEmptyString(formData.name, "Nama peminjam")) {
@@ -392,7 +380,6 @@ export const LoanScreen: React.FC = () => {
       showSuccess("Pinjaman berhasil ditambahkan");
     } catch (error) {
       showError("Gagal menambahkan pinjaman");
-      console.error("Error saving loan:", error);
     }
   };
 
@@ -407,7 +394,6 @@ export const LoanScreen: React.FC = () => {
         showSuccess("Status pinjaman berhasil diperbarui");
       } catch (error) {
         showError("Gagal memperbarui status pinjaman");
-        console.error("Error updating loan status:", error);
       }
     },
     [updateLoanStatus]
@@ -420,7 +406,6 @@ export const LoanScreen: React.FC = () => {
         showSuccess("Pinjaman berhasil dihapus");
       } catch (error) {
         showError("Gagal menghapus pinjaman");
-        console.error("Error deleting loan:", error);
       }
     },
     [deleteLoan]
@@ -435,7 +420,6 @@ export const LoanScreen: React.FC = () => {
         setPaymentHistoryVisible(true);
       } catch (error) {
         showError("Gagal memuat history pembayaran");
-        console.error("Error loading payment history:", error);
       }
     },
     [getLoanPayments]
@@ -587,6 +571,8 @@ export const LoanScreen: React.FC = () => {
     [categories, handleUpdateStatus, handleDelete, handleViewPayments]
   );
 
+  const keyExtractor = useCallback((item: Loan) => item.id!.toString(), []);
+
   return (
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
@@ -599,7 +585,7 @@ export const LoanScreen: React.FC = () => {
       <FlatList
         data={filteredLoans}
         renderItem={renderLoanItem}
-        keyExtractor={(item) => item.id!.toString()}
+        keyExtractor={keyExtractor}
         ListHeaderComponent={headerComponent}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}

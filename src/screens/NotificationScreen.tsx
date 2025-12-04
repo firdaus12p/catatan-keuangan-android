@@ -76,7 +76,6 @@ export const NotificationScreen: React.FC = React.memo(() => {
       const hasScheduled = await checkScheduledNotifications();
       setHasActiveNotification(hasScheduled);
     } catch (error) {
-      console.error("Error loading notification settings:", error);
       showError("Gagal memuat pengaturan notifikasi");
     } finally {
       // Hanya set loading false dan mark sebagai initialized pada load pertama
@@ -131,7 +130,6 @@ export const NotificationScreen: React.FC = React.memo(() => {
         );
       }
     } catch (error) {
-      console.error("Error toggling notification:", error);
 
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -189,7 +187,6 @@ export const NotificationScreen: React.FC = React.memo(() => {
 
       setTimePickerVisible(false);
     } catch (error) {
-      console.error("Error saving time change:", error);
       showError("Gagal menyimpan perubahan waktu");
     }
   };
@@ -226,7 +223,6 @@ export const NotificationScreen: React.FC = React.memo(() => {
 
       showInfo("Notifikasi test akan muncul dalam 3 detik", "Test Notifikasi");
     } catch (error) {
-      console.error("Error sending test notification:", error);
       showError("Gagal mengirim test notifikasi");
     }
   };
@@ -254,7 +250,6 @@ export const NotificationScreen: React.FC = React.memo(() => {
         "Debug Info"
       );
     } catch (error) {
-      console.error("Error debugging notifications:", error);
       showError("Gagal mendebug notifikasi");
     }
   };

@@ -242,7 +242,6 @@ export const HomeScreen: React.FC = () => {
         const saved = await AsyncStorage.getItem("@selectedCategoryIds");
         if (saved) {
           const parsed = JSON.parse(saved) as number[];
-          console.log("[DEBUG] Loaded from AsyncStorage:", parsed);
           setSelectedCategoryIds(parsed);
         }
       } catch (error) {
@@ -262,18 +261,14 @@ export const HomeScreen: React.FC = () => {
       const categoryIds = categories
         .map((cat) => cat.id)
         .filter((id): id is number => id !== undefined);
-      console.log("[DEBUG] Available category IDs:", categoryIds);
-      console.log("[DEBUG] Currently selected IDs:", selectedCategoryIds);
 
       // Filter out invalid IDs (categories that no longer exist)
       const validSelectedIds = selectedCategoryIds.filter((id) =>
         categoryIds.includes(id)
       );
-      console.log("[DEBUG] Valid selected IDs:", validSelectedIds);
 
       if (validSelectedIds.length !== selectedCategoryIds.length) {
         // Some IDs were invalid, update state and AsyncStorage
-        console.log("[DEBUG] Cleaning up invalid IDs");
         setSelectedCategoryIds(validSelectedIds);
         AsyncStorage.setItem(
           "@selectedCategoryIds",
@@ -284,7 +279,6 @@ export const HomeScreen: React.FC = () => {
 
       // Auto-select top 2 categories if no valid selection
       if (validSelectedIds.length === 0) {
-        console.log("[DEBUG] No valid selection, auto-selecting top 2");
         const topCategories = categories
           .filter((cat) => cat.balance > 0 && cat.id)
           .sort((a, b) => b.balance - a.balance)
@@ -308,30 +302,18 @@ export const HomeScreen: React.FC = () => {
 
   // Helper functions untuk kategori selector dengan useCallback
   const handleCategoryToggle = useCallback((categoryId: number) => {
-    console.log("[DEBUG] handleCategoryToggle called with:", categoryId);
     setSelectedCategoryIds((prev) => {
-      console.log("[DEBUG] Current selectedCategoryIds:", prev);
       const isSelected = prev.includes(categoryId);
       let newSelection: number[];
 
       if (isSelected) {
-        console.log("[DEBUG] Deselecting category:", categoryId);
         newSelection = prev.filter((id) => id !== categoryId);
       } else if (prev.length < 2) {
-        console.log(
-          "[DEBUG] Selecting category:",
-          categoryId,
-          "prev.length:",
-          prev.length
-        );
         // ✅ OPTIMIZED: Use .concat() for single item append
         newSelection = prev.concat(categoryId);
       } else {
-        console.log("[DEBUG] Already have 2 categories, ignoring:", categoryId);
         return prev;
       }
-
-      console.log("[DEBUG] New selection:", newSelection);
 
       // Save ke AsyncStorage
       // ✅ OPTIMIZED: Silent error handling - no console.error in production

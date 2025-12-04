@@ -74,24 +74,11 @@ export const CategoryBalanceCard = React.memo<CategoryBalanceCardProps>(
                     !selectedCategoryIds.includes(category.id || 0) &&
                     selectedCategoryIds.length >= 2;
 
-                  console.log("[DEBUG Chip]", category.name, ":", {
-                    id: category.id,
-                    isSelected,
-                    isDisabled,
-                    selectedCategoryIds,
-                    selectedLength: selectedCategoryIds.length,
-                  });
-
                   return (
                     <Chip
                       key={category.id}
                       selected={isSelected}
                       onPress={() => {
-                        console.log(
-                          "[DEBUG Chip] onPress:",
-                          category.id,
-                          category.name
-                        );
                         category.id && onCategoryToggle(category.id);
                       }}
                       style={styles.categoryChip}

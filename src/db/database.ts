@@ -1304,6 +1304,59 @@ class Database {
       throw new Error(errorMessage);
     }
   }
+
+  /**
+   * 🗑️ USER MANUAL CLEANUP: Hapus SEMUA riwayat transaksi tanpa mengubah saldo
+   * Method ini berbeda dengan resetTransactions():
+   * - clearTransactionHistory: Hapus history SAJA, saldo & aggregate TETAP
+   * - resetTransactions: Hapus SEMUA + reset saldo ke 0 + hapus aggregate
+   * 
+   * Use case: User ingin bersihkan riwayat transaksi untuk hemat storage,
+   * tapi tetap pertahankan saldo kategori dan statistik bulanan.
+   * 
+   * CRITICAL SAFETY:
+   * - ✅ Category balances: TIDAK DIUBAH (tetap akurat)
+   * - ✅ Monthly aggregates: TIDAK DIHAPUS (statistik tetap ada)
+   * - ✅ Expense type totals: Di-recalculate (karena tidak ada transaksi)
+   * 
+   * @returns Jumlah transaksi yang dihapus
+   */
+  async clearTransactionHistory(): Promise<number> {
+    await this.ensureInitialized();
+    if (!this.db) throw new Error("Database not initialized");
+
+    try {
+      // Hitung berapa transaksi yang akan dihapus
+      const countResult = await this.db.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM transactions"
+      );
+
+      const deletedCount = countResult?.count || 0;
+
+      if (deletedCount > 0) {
+        // Hapus HANYA record transaksi, JANGAN ubah balance kategori
+        // Balance kategori adalah saldo berjalan yang harus tetap seperti semula
+        // Monthly aggregates TIDAK dihapus agar statistik history tetap ada
+        await this.db.runAsync("DELETE FROM transactions");
+
+        // Recalculate expense type totals karena tidak ada transaksi lagi
+        // Total akan menjadi 0 karena tidak ada transaksi untuk dihitung
+        await this.recalculateExpenseTypeTotals();
+
+        console.log(
+          `[CLEAR HISTORY] Successfully cleared ${deletedCount} transaction records (balances & aggregates preserved)`
+        );
+      }
+
+      return deletedCount;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Gagal membersihkan riwayat transaksi";
+      throw new Error(errorMessage);
+    }
+  }
 }
 
 // Export singleton instance

@@ -28,6 +28,7 @@ export const ResetScreen: React.FC = () => {
     resetLoans,
     resetCategories,
     resetCategoryBalances,
+    clearTransactionHistory, // ✅ NEW: Clear history only, keep balances
     loading,
   } = useApp();
 
@@ -74,7 +75,25 @@ export const ResetScreen: React.FC = () => {
       } else {
         // Custom reset
         if (selectedOptions.transactions) {
-          await resetTransactions();
+          // ✅ NEW: Detect if ONLY transactions selected (other options false)
+          const onlyTransactions =
+            selectedOptions.transactions &&
+            !selectedOptions.loans &&
+            !selectedOptions.categories &&
+            !selectedOptions.balances;
+
+          if (onlyTransactions) {
+            // Clear history only, preserve balances & aggregates
+            const deletedCount = await clearTransactionHistory();
+            showSuccess(
+              `${deletedCount} riwayat transaksi telah dihapus. Saldo kategori tetap dipertahankan.`,
+              "Berhasil"
+            );
+          } else {
+            // Full reset: transactions + other data, reset balances to 0
+            await resetTransactions();
+            showSuccess("Data yang dipilih telah direset", "Berhasil");
+          }
         }
         if (selectedOptions.loans) {
           await resetLoans();
@@ -85,7 +104,16 @@ export const ResetScreen: React.FC = () => {
         if (selectedOptions.balances) {
           await resetCategoryBalances();
         }
-        showSuccess("Data yang dipilih telah direset", "Berhasil");
+
+        // Show success for non-transaction resets
+        if (
+          !selectedOptions.transactions &&
+          (selectedOptions.loans ||
+            selectedOptions.categories ||
+            selectedOptions.balances)
+        ) {
+          showSuccess("Data yang dipilih telah direset", "Berhasil");
+        }
       }
 
       // Reset selection setelah berhasil
@@ -105,8 +133,24 @@ export const ResetScreen: React.FC = () => {
       return "Semua data akan dihapus secara permanen:\n• Riwayat Transaksi\n• Data Pinjaman\n• Kategori\n• Saldo Kategori";
     }
 
+    // ✅ NEW: Detect if ONLY transactions selected
+    const onlyTransactions =
+      selectedOptions.transactions &&
+      !selectedOptions.loans &&
+      !selectedOptions.categories &&
+      !selectedOptions.balances;
+
+    if (onlyTransactions) {
+      // Special case: Clear history only, preserve balances
+      return "Riwayat transaksi akan dihapus:\n• Riwayat Transaksi\n\n✅ Total Saldo, Pemasukan, Pengeluaran, Saldo Bersih, dan Saldo Kategori akan TETAP DIPERTAHANKAN";
+    }
+
+    // Standard case: Full reset with selected items
     const selectedItems = [];
-    if (selectedOptions.transactions) selectedItems.push("• Riwayat Transaksi");
+    if (selectedOptions.transactions)
+      selectedItems.push(
+        "• Riwayat Transaksi (saldo kategori akan direset ke 0)"
+      );
     if (selectedOptions.loans) selectedItems.push("• Data Pinjaman");
     if (selectedOptions.categories) selectedItems.push("• Kategori");
     if (selectedOptions.balances) selectedItems.push("• Saldo Kategori");

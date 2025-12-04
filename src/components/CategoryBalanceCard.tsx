@@ -66,24 +66,41 @@ export const CategoryBalanceCard = React.memo<CategoryBalanceCardProps>(
                 Pilih maksimal 2 kategori:
               </Text>
               <View style={styles.categoryChips}>
-                {categories.map((category) => (
-                  <Chip
-                    key={category.id}
-                    selected={
-                      category.id
-                        ? selectedCategoryIds.includes(category.id)
-                        : false
-                    }
-                    onPress={() => category.id && onCategoryToggle(category.id)}
-                    style={styles.categoryChip}
-                    disabled={
-                      !selectedCategoryIds.includes(category.id || 0) &&
-                      selectedCategoryIds.length >= 2
-                    }
-                  >
-                    {category.name}
-                  </Chip>
-                ))}
+                {categories.map((category) => {
+                  const isSelected = category.id
+                    ? selectedCategoryIds.includes(category.id)
+                    : false;
+                  const isDisabled =
+                    !selectedCategoryIds.includes(category.id || 0) &&
+                    selectedCategoryIds.length >= 2;
+
+                  console.log("[DEBUG Chip]", category.name, ":", {
+                    id: category.id,
+                    isSelected,
+                    isDisabled,
+                    selectedCategoryIds,
+                    selectedLength: selectedCategoryIds.length,
+                  });
+
+                  return (
+                    <Chip
+                      key={category.id}
+                      selected={isSelected}
+                      onPress={() => {
+                        console.log(
+                          "[DEBUG Chip] onPress:",
+                          category.id,
+                          category.name
+                        );
+                        category.id && onCategoryToggle(category.id);
+                      }}
+                      style={styles.categoryChip}
+                      disabled={isDisabled}
+                    >
+                      {category.name}
+                    </Chip>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -134,19 +151,6 @@ export const CategoryBalanceCard = React.memo<CategoryBalanceCardProps>(
           )}
         </Card.Content>
       </Card>
-    );
-  },
-  (prevProps, nextProps) => {
-    // Custom comparison
-    return (
-      prevProps.selectedCategoryIds === nextProps.selectedCategoryIds &&
-      prevProps.showCategorySelector === nextProps.showCategorySelector &&
-      prevProps.animatedCategory1Balance ===
-        nextProps.animatedCategory1Balance &&
-      prevProps.animatedCategory2Balance ===
-        nextProps.animatedCategory2Balance &&
-      prevProps.animatedTotalCombined === nextProps.animatedTotalCombined &&
-      prevProps.categories.length === nextProps.categories.length
     );
   }
 );

@@ -113,6 +113,7 @@ interface AppContextType {
   resetCategories: () => Promise<void>;
   resetCategoryBalances: () => Promise<void>;
   cleanupLoanTransactions: () => Promise<void>;
+  clearTransactionHistory: () => Promise<number>; // ✅ NEW: Clear history only, keep balances
 
   // Loading states
   loading: boolean;
@@ -165,8 +166,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       const data = await database.getAllCategories();
       setCategories(data);
-    } catch (error) {
-    }
+    } catch (error) {}
   }, []);
 
   const addCategory = useCallback(
@@ -230,8 +230,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       const data = await database.getExpenseTypes();
       setExpenseTypes(data);
-    } catch (error) {
-    }
+    } catch (error) {}
   }, []);
 
   const getExpenseTypeTotalsByMonth = useCallback(
@@ -380,8 +379,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           saldoBersih: totalCategoryBalance,
           totalOutstandingLoans,
         });
-      } catch (error) {
-      }
+      } catch (error) {}
     },
     []
   );
@@ -390,8 +388,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       const totalIncome = await database.getTotalIncome();
       setTotalAllTimeBalance(totalIncome);
-    } catch (error) {
-    }
+    } catch (error) {}
   }, []);
 
   const addTransaction = useCallback(
@@ -468,8 +465,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       const data = await database.getAllLoans();
       setLoans(data);
-    } catch (error) {
-    }
+    } catch (error) {}
   }, []);
 
   // ✅ OPTIMIZED: Load all data in parallel for better performance
@@ -628,12 +624,33 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     runWithLoading,
   ]);
 
+  /**
+   * ✅ NEW: Bersihkan riwayat transaksi tanpa mengubah saldo
+   * Berbeda dengan resetTransactions yang juga reset saldo ke 0,
+   * method ini HANYA hapus history transaksi, saldo & aggregate TETAP.
+   *
+   * Use case: User ingin hemat storage tapi tetap pertahankan saldo.
+   */
+  const clearTransactionHistory = useCallback(async (): Promise<number> => {
+    let deletedCount = 0;
+    await runWithLoading(async () => {
+      deletedCount = await database.clearTransactionHistory();
+      // Refresh data setelah cleanup
+      await Promise.all([
+        loadTransactions(), // Akan kosong setelah clear
+        loadExpenseTypes(), // Expense type totals akan 0
+      ]);
+      // Kategori TIDAK perlu reload karena balance tidak berubah
+      // Monthly stats TIDAK perlu reload karena aggregate tetap ada
+    });
+    return deletedCount;
+  }, [loadExpenseTypes, loadTransactions, runWithLoading]);
+
   // Initialize notifications saat app pertama kali dibuka
   const handleInitializeNotifications = useCallback(async (): Promise<void> => {
     try {
       await initializeNotifications();
-    } catch (error) {
-    }
+    } catch (error) {}
   }, []);
 
   const initializeApp = useCallback(async (): Promise<void> => {
@@ -716,6 +733,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       resetCategories,
       resetCategoryBalances,
       cleanupLoanTransactions,
+      clearTransactionHistory, // ✅ NEW: Clear history only
 
       // Loading state
       loading,
@@ -732,6 +750,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       addTransaction,
       categories,
       cleanupLoanTransactions,
+      clearTransactionHistory, // ✅ NEW
       deleteCategory,
       deleteExpenseType,
       deleteLoan,

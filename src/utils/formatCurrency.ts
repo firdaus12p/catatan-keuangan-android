@@ -9,12 +9,15 @@ export const formatCurrency = (amount: number): string => {
   return amount < 0 ? `-Rp${formatted}` : `Rp${formatted}`;
 };
 
-// Format angka tanpa simbol mata uang
+// Format angka tanpa simbol mata uang (tanpa desimal)
 export const formatNumber = (amount: number): string => {
-  return new Intl.NumberFormat("id-ID").format(amount);
+  return new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(amount));
 };
 
-// Format angka untuk input dengan titik sebagai pemisah ribuan
+// Format angka untuk input dengan titik sebagai pemisah ribuan (tanpa desimal)
 export const formatNumberInput = (value: string): string => {
   // Hapus semua karakter non-digit
   const numbers = value.replace(/[^\d]/g, "");
@@ -22,8 +25,11 @@ export const formatNumberInput = (value: string): string => {
   // Jika kosong, return kosong
   if (!numbers) return "";
 
-  // Format dengan titik sebagai pemisah ribuan
-  return parseInt(numbers).toLocaleString("id-ID");
+  // Format dengan titik sebagai pemisah ribuan (explicit 0 decimals)
+  return parseInt(numbers).toLocaleString("id-ID", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 };
 
 // Parse string input kembali ke number

@@ -685,7 +685,9 @@ class Database {
       // Bagi pemasukan ke semua kategori berdasarkan persentase
       await this.db.withExclusiveTransactionAsync(async (txn) => {
         for (const category of categories) {
-          const categoryAmount = (amount * category.percentage) / 100;
+          const categoryAmount = Math.round(
+            (amount * category.percentage) / 100
+          );
 
           await txn.runAsync(
             "INSERT INTO transactions (type, amount, category_id, note, date, expense_type_id) VALUES (?, ?, ?, ?, ?, ?)",
@@ -767,7 +769,7 @@ class Database {
         for (const category of selectedCategories) {
           // Hitung proporsi kategori ini dari total kategori yang dipilih
           const proportion = category.percentage / totalSelectedPercentage;
-          const categoryAmount = amount * proportion;
+          const categoryAmount = Math.round(amount * proportion);
 
           await txn.runAsync(
             "INSERT INTO transactions (type, amount, category_id, note, date, expense_type_id) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1310,15 +1312,15 @@ class Database {
    * Method ini berbeda dengan resetTransactions():
    * - clearTransactionHistory: Hapus history SAJA, saldo & aggregate TETAP
    * - resetTransactions: Hapus SEMUA + reset saldo ke 0 + hapus aggregate
-   * 
+   *
    * Use case: User ingin bersihkan riwayat transaksi untuk hemat storage,
    * tapi tetap pertahankan saldo kategori dan statistik bulanan.
-   * 
+   *
    * CRITICAL SAFETY:
    * - ✅ Category balances: TIDAK DIUBAH (tetap akurat)
    * - ✅ Monthly aggregates: TIDAK DIHAPUS (statistik tetap ada)
    * - ✅ Expense type totals: Di-recalculate (karena tidak ada transaksi)
-   * 
+   *
    * @returns Jumlah transaksi yang dihapus
    */
   async clearTransactionHistory(): Promise<number> {

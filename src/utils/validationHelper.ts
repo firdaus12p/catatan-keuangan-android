@@ -1,4 +1,5 @@
 import { showError } from "./alertHelper";
+import { formatCurrency } from "./formatCurrency";
 
 /**
  * Utility functions untuk validasi input yang umum digunakan
@@ -55,9 +56,9 @@ export const validateSufficientBalance = (
 ): boolean => {
   if (balance < required) {
     showError(
-      `Saldo ${itemName} tidak mencukupi. Tersedia: ${balance.toLocaleString(
-        "id-ID"
-      )}, Diperlukan: ${required.toLocaleString("id-ID")}`
+      `Saldo ${itemName} tidak mencukupi. Tersedia: ${formatCurrency(
+        balance
+      )}, Diperlukan: ${formatCurrency(required)}`
     );
     return false;
   }

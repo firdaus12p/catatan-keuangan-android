@@ -1,50 +1,100 @@
-# Welcome to your Expo app 👋
+# 💸 Kemenku - Aplikasi Catatan Keuangan Pribadi
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplikasi keuangan pribadi offline-first untuk Android dengan fokus pada **distribusi pendapatan otomatis berbasis kategori**.
 
-## Get started
+## ⚠️ PENTING: Expo Go TIDAK Didukung!
 
-1. Install dependencies
+Aplikasi ini menggunakan `expo-sqlite` (native module) yang **TIDAK BERFUNGSI di Expo Go**.
 
-   ```bash
-   npm install
-   ```
+❌ **JANGAN** scan QR code dengan Expo Go  
+✅ **HARUS** build development APK terlebih dahulu
 
-2. Start the app
+## 🚀 Cara Menjalankan
 
-   ```bash
-   npx expo start
-   ```
+### Prerequisites
 
-In the output, you'll find options to open the app in a
+- Node.js 18+
+- Android Studio (untuk Android SDK & emulator)
+- JDK 17+ (biasanya sudah termasuk di Android Studio)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### Step 1: Install Dependencies
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Step 2: Setup Android (Pertama Kali)
 
-## Learn more
+```bash
+# Generate folder android
+npx expo prebuild
 
-To learn more about developing your project with Expo, look at the following resources:
+# Buat file android/local.properties dengan SDK path
+# Windows:
+echo sdk.dir=C:\\Users\\YOUR_USERNAME\\AppData\\Local\\Android\\Sdk > android/local.properties
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# macOS/Linux:
+echo "sdk.dir=$HOME/Library/Android/sdk" > android/local.properties
+```
 
-## Join the community
+### Step 3: Build & Run
 
-Join our community of developers creating universal apps.
+**Option A: Development Build (Recommended)**
+```bash
+npx expo run:android
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**Option B: Build APK Manual**
+```bash
+cd android
+./gradlew assembleDebug
+# APK di: android/app/build/outputs/apk/debug/app-debug.apk
+# Install ke device/emulator
+```
+
+**Option C: Production Build**
+```bash
+cd android
+./gradlew assembleRelease
+# APK di: android/app/build/outputs/apk/release/app-release.apk
+```
+
+## 🐛 Troubleshooting
+
+### Error: "Database not initialized"
+- **Penyebab**: Menggunakan Expo Go
+- **Solusi**: Build APK dengan `npx expo run:android`
+
+### Error: "<<<<<<< HEAD" atau merge conflicts
+- **Penyebab**: Unresolved git merge conflicts
+- **Solusi**: Lihat [MERGE_CONFLICT_FIX.md](MERGE_CONFLICT_FIX.md)
+
+### Error: "SDK location not found"
+- **Solusi**: Buat file `android/local.properties` dengan path SDK Android Anda
+
+### Error: "JAVA_COMPILER not found"
+- **Solusi**: Set JDK path di `android/gradle.properties`:
+  ```
+  org.gradle.java.home=C:\\Program Files\\Android\\Android Studio\\jbr
+  ```
+
+Untuk troubleshooting lengkap, lihat [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+## 📱 Tech Stack
+
+- **Framework**: React Native + Expo SDK 54
+- **Navigation**: Expo Router v6 (file-based)
+- **Database**: expo-sqlite (local SQLite)
+- **UI**: React Native Paper
+- **Language**: TypeScript 5.9
+
+## 📄 Dokumentasi
+
+- [BUILD.md](BUILD.md) - Panduan build lengkap
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Solusi masalah umum
+- [CHANGELOG.md](CHANGELOG.md) - Riwayat perubahan
+- [.github/copilot-instructions.md](.github/copilot-instructions.md) - Dokumentasi teknis lengkap
+
+## 📝 License
+
+MIT License
